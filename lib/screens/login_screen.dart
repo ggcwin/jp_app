@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import 'dashboard_screen.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart'; // ✨ NAYA IMPORT
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -362,6 +363,25 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                   ),
                   const SizedBox(height: 30),
+
+                  // ✨ NAYA FORGOT PASSWORD BUTTON
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ForgotPasswordScreen(),
+                      ),
+                    ),
+                    child: const Text(
+                      "Forgot Security Key?",
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+
                   TextButton(
                     onPressed: () => Navigator.push(
                       context,

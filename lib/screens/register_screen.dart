@@ -14,13 +14,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _sponsorController = TextEditingController();
+  final _dobController = TextEditingController(); // ✨ NAYA: DOB Controller
   bool _isLoading = false;
 
+  // ✨ NAYA: Calendar se Date select karne ka function
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Colors.amber,
+              onPrimary: Colors.black,
+              surface: Color(0xFF1E003E),
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        // Format YYYY-MM-DD
+        _dobController.text =
+            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
   void _register() async {
-    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+    if (_usernameController.text.isEmpty ||
+        _passwordController.text.isEmpty ||
+        _dobController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill all fields, including Date of Birth!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
       return;
     }
 
@@ -30,6 +66,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       username: _usernameController.text,
       email: _emailController.text,
       password: _passwordController.text,
+      dob: _dobController.text, // ✨ NAYA: Backend ko DOB bheji ja rahi hai
       sponsorUsername: _sponsorController.text,
     );
 
@@ -38,9 +75,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
 
     if (response['success'] == true ||
-        response['message'] != null &&
-            response['message'].contains('successful') ||
-        response['message'].contains('Admin')) {
+        (response['message'] != null &&
+            response['message'].contains('successfully'))) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(response['message'] ?? 'Registered successfully!'),
@@ -103,7 +139,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 30),
 
-                  // Glassmorphism Form
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: BackdropFilter(
@@ -143,6 +178,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             ),
                             const SizedBox(height: 15),
+
+                            // ✨ NAYA: Date of Birth Field
+                            TextField(
+                              controller: _dobController,
+                              readOnly: true, // Keyboard open na ho
+                              onTap: () =>
+                                  _selectDate(context), // Calendar open ho
+                              style: const TextStyle(color: Colors.white),
+                              decoration: const InputDecoration(
+                                labelText: 'Date of Birth (Security Key)',
+                                labelStyle: TextStyle(color: Colors.white54),
+                                prefixIcon: Icon(
+                                  Icons.calendar_month,
+                                  color: Colors.amber,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+
                             TextField(
                               controller: _passwordController,
                               obscureText: true,
