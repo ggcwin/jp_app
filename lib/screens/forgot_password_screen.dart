@@ -14,8 +14,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _dobController = TextEditingController();
   final _newPasswordController = TextEditingController();
   bool _isLoading = false;
+  bool _isPasswordVisible = false; // ✨ EYE ICON STATE
 
-  // ✨ Calendar se Date select karne ka function
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -38,14 +38,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
     if (picked != null) {
       setState(() {
-        // Backend ko YYYY-MM-DD format chahiye hota hai
         _dobController.text =
             "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
     }
   }
 
-  // ✨ Password Reset Logic
   void _resetPassword() async {
     if (_emailController.text.isEmpty ||
         _dobController.text.isEmpty ||
@@ -83,8 +81,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pop(context); // Wapas Login Screen par le jao
+      Navigator.pop(context);
     } else {
+      // ✨ AB YAHAN BACKEND KA ASLI ERROR AAYEGA (E.g. "User not found")
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -110,7 +109,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
       body: Stack(
         children: [
-          // 🌌 Background Gradient
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -120,8 +118,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
             ),
           ),
-
-          // ✨ Glowing Gold Orb (Luxury Light)
           Positioned(
             top: -50,
             right: -50,
@@ -141,7 +137,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
             ),
           ),
-
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(25),
@@ -166,8 +161,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                   const SizedBox(height: 35),
-
-                  // 💎 Glassmorphism Box
                   ClipRRect(
                     borderRadius: BorderRadius.circular(25),
                     child: BackdropFilter(
@@ -214,8 +207,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               ),
                             ),
                             const SizedBox(height: 20),
-
-                            // ✨ DOB Field
                             TextField(
                               controller: _dobController,
                               readOnly: true,
@@ -243,10 +234,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ),
                             const SizedBox(height: 20),
 
-                            // Naya Password Field
+                            // ✨ UPDATED PASSWORD FIELD (WITH EYE ICON)
                             TextField(
                               controller: _newPasswordController,
-                              obscureText: true,
+                              obscureText:
+                                  !_isPasswordVisible, // Toggle Visibility
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -266,11 +258,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   Icons.vpn_key,
                                   color: Colors.amber,
                                 ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
+                                    color: Colors.amberAccent.withOpacity(0.7),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
+                                ),
                               ),
                             ),
                             const SizedBox(height: 35),
 
-                            // Update Button
                             SizedBox(
                               width: double.infinity,
                               height: 55,

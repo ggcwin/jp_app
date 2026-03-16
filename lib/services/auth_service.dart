@@ -72,9 +72,23 @@ class AuthService {
           'newPassword': newPassword,
         }),
       );
-      return jsonDecode(response.body);
+
+      // ✨ NAYA: Agar backend ne error (400 ya 404) bheja hai, toh usey properly show karo
+      if (response.statusCode == 200 ||
+          response.statusCode == 400 ||
+          response.statusCode == 404) {
+        return jsonDecode(response.body);
+      } else {
+        return {
+          'success': false,
+          'message': 'Server Error: ${response.statusCode}',
+        };
+      }
     } catch (e) {
-      return {'success': false, 'message': 'Network Error'};
+      return {
+        'success': false,
+        'message': 'Network Error. Is your server running?',
+      };
     }
   }
 
