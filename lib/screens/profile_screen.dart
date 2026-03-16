@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
+import 'admin_dashboard_screen.dart'; // ✨ NAYA IMPORT
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -142,6 +143,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: 40),
 
+                        // 👑 ADMIN PANEL BUTTON (Sirf Admin ko dikhega)
+                        if (_userData?['role'] == 'admin') ...[
+                          ListTile(
+                            leading: const Icon(
+                              Icons.admin_panel_settings,
+                              color: Colors.redAccent,
+                              size: 30,
+                            ),
+                            title: const Text(
+                              'Admin Dashboard',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: const Text(
+                              'Manage locked accounts & system',
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.white54,
+                              size: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            tileColor: Colors.redAccent.withOpacity(0.1),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const AdminDashboardScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 15),
+                        ],
+
                         // ✏️ Update Profile Menu Item
                         ListTile(
                           leading: const Icon(
@@ -173,7 +217,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           tileColor: Colors.white.withOpacity(0.05),
                           onTap: () {
-                            // TODO: Future Update Profile Screen logic
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(
@@ -221,7 +264,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           },
                         ),
 
-                        // Spacer sab kuch oopar push kar dega aur Logout ko bilkul bottom par le jayega
                         const Spacer(),
 
                         // 🚪 LOGOUT BUTTON (At the Bottom)
@@ -252,7 +294,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 letterSpacing: 2,
                               ),
                             ),
-                            onPressed: _logout, // Logout function call hoga
+                            onPressed: _logout,
                           ),
                         ),
                         const SizedBox(height: 10),
