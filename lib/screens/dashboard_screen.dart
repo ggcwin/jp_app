@@ -6,7 +6,8 @@ import 'play_screen.dart';
 import 'my_tickets_screen.dart';
 import 'deposit_screen.dart';
 import 'withdraw_screen.dart';
-import 'create_voucher_screen.dart'; // ✨ Naya Import
+import 'create_voucher_screen.dart';
+import 'profile_screen.dart'; // ✨ NAYA IMPORT: Profile Screen ke liye
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -190,27 +191,38 @@ class _DashboardScreenState extends State<DashboardScreen>
                     children: [
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [Colors.amberAccent, Colors.orange],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.amberAccent.withOpacity(0.5),
-                                  blurRadius: 15,
+                          // ✨ PROFILE SCREEN NAVIGATION
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ProfileScreen(),
                                 ),
-                              ],
-                            ),
-                            child: const CircleAvatar(
-                              radius: 22,
-                              backgroundColor: Colors.black87,
-                              child: Icon(
-                                Icons.person,
-                                color: Colors.amberAccent,
-                                size: 28,
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: const LinearGradient(
+                                  colors: [Colors.amberAccent, Colors.orange],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.amberAccent.withOpacity(0.5),
+                                    blurRadius: 15,
+                                  ),
+                                ],
+                              ),
+                              child: const CircleAvatar(
+                                radius: 22,
+                                backgroundColor: Colors.black87,
+                                child: Icon(
+                                  Icons.person,
+                                  color: Colors.amberAccent,
+                                  size: 28,
+                                ),
                               ),
                             ),
                           ),

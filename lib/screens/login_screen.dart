@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import 'dashboard_screen.dart';
 import 'register_screen.dart';
-import 'forgot_password_screen.dart'; // ✨ NAYA IMPORT
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _isPasswordVisible = false; // ✨ EYE ICON STATE VARIABLE
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -147,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen>
             child: Opacity(
               opacity: 0.8,
               child: Lottie.network(
-                'https://assets8.lottiefiles.com/packages/lf20_p8bfn5to.json', // Abstract Luxury Gold Dust
+                'https://assets8.lottiefiles.com/packages/lf20_p8bfn5to.json',
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => const SizedBox(),
               ),
@@ -284,9 +285,11 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                             ),
                             const SizedBox(height: 20),
+
+                            // ✨ UPDATED PASSWORD FIELD (WITH EYE ICON)
                             TextField(
                               controller: _passwordController,
-                              obscureText: true,
+                              obscureText: !_isPasswordVisible, // Toggle logic
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -306,6 +309,19 @@ class _LoginScreenState extends State<LoginScreen>
                                 prefixIcon: const Icon(
                                   Icons.vpn_key_outlined,
                                   color: Colors.amberAccent,
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
+                                    color: Colors.amberAccent.withOpacity(0.7),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
                                 ),
                               ),
                             ),
@@ -364,7 +380,6 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                   const SizedBox(height: 30),
 
-                  // ✨ NAYA FORGOT PASSWORD BUTTON
                   TextButton(
                     onPressed: () => Navigator.push(
                       context,

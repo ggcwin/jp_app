@@ -14,10 +14,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _sponsorController = TextEditingController();
-  final _dobController = TextEditingController(); // ✨ NAYA: DOB Controller
-  bool _isLoading = false;
+  final _dobController = TextEditingController();
 
-  // ✨ NAYA: Calendar se Date select karne ka function
+  bool _isLoading = false;
+  bool _isPasswordVisible = false; // ✨ EYE ICON STATE VARIABLE
+
+  // ✨ Calendar se Date select karne ka function
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -66,7 +68,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       username: _usernameController.text,
       email: _emailController.text,
       password: _passwordController.text,
-      dob: _dobController.text, // ✨ NAYA: Backend ko DOB bheji ja rahi hai
+      dob: _dobController.text,
       sponsorUsername: _sponsorController.text,
     );
 
@@ -179,12 +181,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             const SizedBox(height: 15),
 
-                            // ✨ NAYA: Date of Birth Field
+                            // ✨ Date of Birth Field
                             TextField(
                               controller: _dobController,
-                              readOnly: true, // Keyboard open na ho
-                              onTap: () =>
-                                  _selectDate(context), // Calendar open ho
+                              readOnly: true,
+                              onTap: () => _selectDate(context),
                               style: const TextStyle(color: Colors.white),
                               decoration: const InputDecoration(
                                 labelText: 'Date of Birth (Security Key)',
@@ -197,20 +198,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             const SizedBox(height: 15),
 
+                            // ✨ UPDATED PASSWORD FIELD (WITH EYE ICON)
                             TextField(
                               controller: _passwordController,
-                              obscureText: true,
+                              obscureText: !_isPasswordVisible, // Toggle Logic
                               style: const TextStyle(color: Colors.white),
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Password',
-                                labelStyle: TextStyle(color: Colors.white54),
-                                prefixIcon: Icon(
+                                labelStyle: const TextStyle(
+                                  color: Colors.white54,
+                                ),
+                                prefixIcon: const Icon(
                                   Icons.lock,
                                   color: Colors.amber,
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
+                                    color: Colors.amber.withOpacity(0.7),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
                                 ),
                               ),
                             ),
                             const SizedBox(height: 15),
+
                             TextField(
                               controller: _sponsorController,
                               style: const TextStyle(color: Colors.white),

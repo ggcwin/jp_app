@@ -1,10 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../constants.dart'; // ✨ IMPORT CONSTANTS
+import '../constants.dart';
 
 class AuthService {
-  // ✨ YAHAN CONSTANT USE KIYA HAI
   static const String baseUrl = '${AppConstants.baseUrl}/auth';
 
   // --- 🔐 LOGIN API ---
@@ -27,11 +26,12 @@ class AuthService {
     }
   }
 
-  // --- 📝 REGISTER API ---
+  // --- 📝 REGISTER API (WITH DOB) ---
   static Future<Map<String, dynamic>> registerUser({
     required String username,
     required String email,
     required String password,
+    required String dob, // ✨ DOB ADD HO GAYI
     required String sponsorUsername,
   }) async {
     try {
@@ -42,8 +42,8 @@ class AuthService {
           'username': username,
           'email': email,
           'password': password,
-          'dob': '2000-01-01', // Dummy DOB for now
-          'sponsorUsername': sponsorUsername,
+          'dob': dob, // ✨ Backend ko asli DOB bhej rahe hain
+          'referrer': sponsorUsername, // Backend 'referrer' accept karta hai
         }),
       );
 
@@ -56,7 +56,29 @@ class AuthService {
     }
   }
 
-  // --- 👤 GET CURRENT USER DATA (Balance & Wallets) ---
+  // --- 🔄 RESET PASSWORD (WITH DOB) ---
+  static Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String dob,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/reset-password-dob'), // Backend API Link
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'dob': dob,
+          'newPassword': newPassword,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network Error'};
+    }
+  }
+
+  // --- 👤 GET CURRENT USER DATA ---
   static Future<Map<String, dynamic>> getUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
