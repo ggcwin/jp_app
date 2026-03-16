@@ -16,8 +16,8 @@ class AuthService {
         Uri.parse('$baseUrl/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'username': username.toLowerCase().trim(), 
-          'password': password
+          'username': username.toLowerCase().trim(),
+          'password': password,
         }),
       );
       return jsonDecode(response.body);
@@ -42,11 +42,17 @@ class AuthService {
         Uri.parse('$baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'username': username.toString().toLowerCase().trim(), // Numbers allow karne ke liye
+          'username': username
+              .toString()
+              .toLowerCase()
+              .trim(), // Numbers allow karne ke liye
           'email': email.toLowerCase().trim(),
           'password': password,
           'dob': dob,
-          'sponsorUsername': sponsorUsername.toString().toLowerCase().trim(), // ✨ Match for backend
+          'sponsorUsername': sponsorUsername
+              .toString()
+              .toLowerCase()
+              .trim(), // ✨ Match for backend
         }),
       );
 
@@ -67,7 +73,7 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/reset-password-dob'), 
+        Uri.parse('$baseUrl/reset-password-dob'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
@@ -101,7 +107,7 @@ class AuthService {
       final token = prefs.getString('auth_token');
 
       if (token == null) {
-        return {'success': false, 'message': 'Not logged in'};\
+        return {'success': false, 'message': 'Not logged in'};
       }
 
       final response = await http.get(
