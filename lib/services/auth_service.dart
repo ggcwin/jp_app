@@ -15,7 +15,10 @@ class AuthService {
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username, 'password': password}),
+        body: jsonEncode({
+          'username': username.toLowerCase().trim(), 
+          'password': password
+        }),
       );
       return jsonDecode(response.body);
     } catch (e) {
@@ -26,24 +29,24 @@ class AuthService {
     }
   }
 
-  // --- 📝 REGISTER API (WITH DOB) ---
+  // --- 📝 REGISTER API (WITH DOB & NUMERIC USERNAME FIX) ---
   static Future<Map<String, dynamic>> registerUser({
     required String username,
     required String email,
     required String password,
-    required String dob, // ✨ DOB ADD HO GAYI
-    required String sponsorUsername,
+    required String dob,
+    required String sponsorUsername, // ✨ Backend expects this
   }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'username': username,
-          'email': email,
+          'username': username.toString().toLowerCase().trim(), // Numbers allow karne ke liye
+          'email': email.toLowerCase().trim(),
           'password': password,
-          'dob': dob, // ✨ Backend ko asli DOB bhej rahe hain
-          'referrer': sponsorUsername, // Backend 'referrer' accept karta hai
+          'dob': dob,
+          'sponsorUsername': sponsorUsername.toString().toLowerCase().trim(), // ✨ Match for backend
         }),
       );
 
@@ -64,7 +67,7 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/reset-password-dob'), // Backend API Link
+        Uri.parse('$baseUrl/reset-password-dob'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
@@ -73,7 +76,6 @@ class AuthService {
         }),
       );
 
-      // ✨ NAYA: Agar backend ne error (400 ya 404) bheja hai, toh usey properly show karo
       if (response.statusCode == 200 ||
           response.statusCode == 400 ||
           response.statusCode == 404) {
@@ -99,7 +101,7 @@ class AuthService {
       final token = prefs.getString('auth_token');
 
       if (token == null) {
-        return {'success': false, 'message': 'Not logged in'};
+        return {'success': false, 'message': 'Not logged in'};\
       }
 
       final response = await http.get(
