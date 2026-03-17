@@ -115,8 +115,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    // ✨ FIX: Dollar ki jagah Rs. aur 2 decimal places lagaye gaye hain
                     Text(
-                      '\$${price.toStringAsFixed(3)}',
+                      'Rs. ${price.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,

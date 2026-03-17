@@ -356,7 +356,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Text(
-                                      '\$${winBalance.toStringAsFixed(2)}',
+                                      // ✨ PKR Formatting applied here
+                                      'Rs. ${winBalance.toStringAsFixed(2)}',
                                       style: const TextStyle(
                                         fontSize: 55,
                                         fontWeight: FontWeight.w900,
@@ -397,9 +398,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
+                      // ✨ PKR Formatting applied in all wallets below
                       _buildGlassWallet(
                         'PLAY BALANCE',
-                        '\$${playBalance.toStringAsFixed(2)}',
+                        'Rs. ${playBalance.toStringAsFixed(2)}',
                         Colors.greenAccent,
                         Icons.account_balance_wallet,
                         () => Navigator.push(
@@ -411,7 +413,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                       _buildGlassWallet(
                         'WIN WALLET',
-                        '\$${winBalance.toStringAsFixed(2)}',
+                        'Rs. ${winBalance.toStringAsFixed(2)}',
                         Colors.pinkAccent,
                         Icons.emoji_events,
                         () => Navigator.push(
@@ -423,7 +425,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                       _buildGlassWallet(
                         'BONUS',
-                        '\$${bonusBalance.toStringAsFixed(2)}',
+                        'Rs. ${bonusBalance.toStringAsFixed(2)}',
                         Colors.cyanAccent,
                         Icons.card_giftcard,
                         null,
@@ -492,7 +494,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                   const SizedBox(height: 15),
 
-                  // ✨ Naya P2P Voucher Button
+                  // ✨ P2P Voucher Button
                   SizedBox(
                     width: double.infinity,
                     height: 55,

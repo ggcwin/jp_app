@@ -50,14 +50,16 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   }
 
   void _handleWithdraw() async {
-    final amountText = _amountController.text.replaceAll('\$', '');
+    // ✨ FIX: Rs. replace kiya gaya hai
+    final amountText = _amountController.text.replaceAll('Rs.', '').trim();
     final amount = double.tryParse(amountText);
     final address = _addressController.text.trim();
 
-    if (amount == null || amount < 5) {
+    // ✨ FIX: Minimum limit Rs. 500 kar di gayi hai
+    if (amount == null || amount < 500) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Minimum withdrawal is \$5'),
+          content: Text('Minimum withdrawal is Rs. 500'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -145,8 +147,9 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              // ✨ FIX: Rs. Symbol
               Text(
-                '\$${balance.toStringAsFixed(2)}',
+                'Rs. ${balance.toStringAsFixed(2)}',
                 style: TextStyle(
                   color: color,
                   fontSize: 14,
@@ -250,7 +253,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                           ),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 50,
+                            fontSize: 45, // Thora chota kiya fit karne ke liye
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                           ),
@@ -258,9 +261,10 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                             border: InputBorder.none,
                             hintText: '0.00',
                             hintStyle: TextStyle(color: Colors.white24),
-                            prefixText: '\$ ',
+                            // ✨ FIX: Prefix ab Rs. hai
+                            prefixText: 'Rs. ',
                             prefixStyle: TextStyle(
-                              fontSize: 50,
+                              fontSize: 35,
                               color: Colors.pinkAccent,
                             ),
                           ),
@@ -273,8 +277,9 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                               'Tx Fee (10%):',
                               style: TextStyle(color: Colors.white54),
                             ),
+                            // ✨ FIX: Rs. Symbol
                             Text(
-                              '\$${_feeAmount.toStringAsFixed(2)}',
+                              'Rs. ${_feeAmount.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 color: Colors.redAccent,
                                 fontWeight: FontWeight.bold,
@@ -290,8 +295,9 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                               'You Receive:',
                               style: TextStyle(color: Colors.white),
                             ),
+                            // ✨ FIX: Rs. Symbol
                             Text(
-                              '\$${_payableAmount.toStringAsFixed(2)}',
+                              'Rs. ${_payableAmount.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 color: Colors.greenAccent,
                                 fontSize: 18,
@@ -320,7 +326,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                 controller: _addressController,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Enter TRC20/BEP20 Address or IBAN',
+                  hintText: 'Enter Account Title / Bank Name / IBAN',
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.05),
                   border: OutlineInputBorder(

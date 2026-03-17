@@ -47,13 +47,15 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
   }
 
   void _handleCreateVoucher() async {
-    final amountText = _amountController.text.replaceAll('\$', '');
+    // ✨ FIX: Dollar ki jagah Rs. ko replace karein
+    final amountText = _amountController.text.replaceAll('Rs.', '').trim();
     final amount = double.tryParse(amountText);
 
-    if (amount == null || amount < 1) {
+    // ✨ FIX: Minimum voucher limit Rs. 100 kar di gayi hai
+    if (amount == null || amount < 100) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Minimum voucher value is \$1'),
+          content: Text('Minimum voucher value is Rs. 100'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -109,8 +111,9 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ✨ FIX: Rs. Symbol
               Text(
-                'Value: \$${amount.toStringAsFixed(2)}',
+                'Value: Rs. ${amount.toStringAsFixed(2)}',
                 style: const TextStyle(color: Colors.white70, fontSize: 16),
               ),
               const SizedBox(height: 20),
@@ -217,8 +220,9 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              // ✨ FIX: Rs. Symbol
               Text(
-                '\$${balance.toStringAsFixed(2)}',
+                'Rs. ${balance.toStringAsFixed(2)}',
                 style: TextStyle(
                   color: color,
                   fontSize: 14,
@@ -323,7 +327,7 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
                           ),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 50,
+                            fontSize: 45, // Thora chota kiya taake Rs fit aaye
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                           ),
@@ -331,9 +335,10 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
                             border: InputBorder.none,
                             hintText: '0.00',
                             hintStyle: TextStyle(color: Colors.white24),
-                            prefixText: '\$ ',
+                            // ✨ FIX: Prefix ab Rs. hai
+                            prefixText: 'Rs. ',
                             prefixStyle: TextStyle(
-                              fontSize: 50,
+                              fontSize: 35,
                               color: Colors.cyanAccent,
                             ),
                           ),
@@ -346,8 +351,9 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
                               'Creation Fee (3%):',
                               style: TextStyle(color: Colors.white54),
                             ),
+                            // ✨ FIX: Rs. Symbol
                             Text(
-                              '\$${_feeAmount.toStringAsFixed(2)}',
+                              'Rs. ${_feeAmount.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 color: Colors.redAccent,
                                 fontWeight: FontWeight.bold,
@@ -366,8 +372,9 @@ class _CreateVoucherScreenState extends State<CreateVoucherScreen> {
                                 fontSize: 16,
                               ),
                             ),
+                            // ✨ FIX: Rs. Symbol
                             Text(
-                              '\$${_totalCost.toStringAsFixed(2)}',
+                              'Rs. ${_totalCost.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 color: Colors.cyanAccent,
                                 fontSize: 20,
