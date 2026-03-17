@@ -99,7 +99,6 @@ class _PlayScreenState extends State<PlayScreen> {
           if (_rowsTypes[i]['mixFix'] == true) c++;
           multiplier = c > 0 ? c : 0;
         }
-        // ✨ NAYA LOGIC: Ticket Price Fixed to Rs. 5.0
         price += 5.0 * multiplier * _ticketQuantity;
       }
     }
@@ -144,7 +143,7 @@ class _PlayScreenState extends State<PlayScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Please select Straight or Mix Fix for Line ${r + 1}!',
+              'Please select Fix or Mix for Line ${r + 1}!', // ✨ Changed text here
             ),
             backgroundColor: Colors.redAccent,
           ),
@@ -169,7 +168,8 @@ class _PlayScreenState extends State<PlayScreen> {
       String typeStr = "";
       if (_selectedGame == '4tune') {
         List<String> t = [];
-        if (_rowsTypes[r]['straight'] == true) t.add("Str");
+        if (_rowsTypes[r]['straight'] == true)
+          t.add("Fix"); // ✨ Changed 'Str' to 'Fix'
         if (_rowsTypes[r]['mixFix'] == true) t.add("Mix");
         typeStr = " (${t.join('+')})";
       }
@@ -267,7 +267,6 @@ class _PlayScreenState extends State<PlayScreen> {
             ],
           ),
           content: Text(
-            // ✨ FIX: Rs. formatting
             'Your selected wallet does not have enough balance to purchase this ticket (Rs. ${_currentPrice.toStringAsFixed(2)} required).',
             style: const TextStyle(color: Colors.white70),
           ),
@@ -344,7 +343,6 @@ class _PlayScreenState extends State<PlayScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                // ✨ FIX: Rs. formatting
                 Text(
                   'Rs. ${balance.toStringAsFixed(2)}',
                   style: TextStyle(
@@ -557,13 +555,14 @@ class _PlayScreenState extends State<PlayScreen> {
                                                   onChanged: (val) {
                                                     if (val.isNotEmpty &&
                                                         colIndex < 3 &&
-                                                        !limitReached)
+                                                        !limitReached) {
                                                       FocusScope.of(
                                                         context,
                                                       ).requestFocus(
                                                         _rowsFocusNodes[rowIndex][colIndex +
                                                             1],
                                                       );
+                                                    }
                                                   },
                                                 ),
                                         ),
@@ -595,8 +594,9 @@ class _PlayScreenState extends State<PlayScreen> {
                                             ),
                                           ),
                                         ),
+                                        // ✨ LABEL UPDATED TO 'Fix'
                                         const Text(
-                                          'Straight',
+                                          'Fix',
                                           style: TextStyle(
                                             color: Colors.amberAccent,
                                           ),
@@ -619,8 +619,9 @@ class _PlayScreenState extends State<PlayScreen> {
                                             ),
                                           ),
                                         ),
+                                        // ✨ LABEL UPDATED TO 'Mix'
                                         const Text(
-                                          'Mix Fix',
+                                          'Mix',
                                           style: TextStyle(
                                             color: Colors.amberAccent,
                                           ),
@@ -690,8 +691,9 @@ class _PlayScreenState extends State<PlayScreen> {
                                         color: Colors.amber,
                                       ),
                                       onPressed: () {
-                                        if (_ticketQuantity > 1)
+                                        if (_ticketQuantity > 1) {
                                           setState(() => _ticketQuantity--);
+                                        }
                                       },
                                     ),
                                     Text(
@@ -783,7 +785,6 @@ class _PlayScreenState extends State<PlayScreen> {
                                     ? const CircularProgressIndicator(
                                         color: Colors.black,
                                       )
-                                    // ✨ FIX: Rs. formatting applied
                                     : Text(
                                         'GET NOW (Rs. ${_currentPrice.toStringAsFixed(2)})',
                                         style: const TextStyle(
