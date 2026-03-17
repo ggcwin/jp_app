@@ -27,32 +27,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isRigged = false;
   bool _isUpdatingDraw = false;
 
+  // Ticket Stats Variables
+  List<Map<String, dynamic>> _soldNumbers = [];
+  List<Map<String, dynamic>> _repeatingNumbers = [];
+  List<String> _unsoldNumbers = [];
+
   @override
   void initState() {
     super.initState();
     _initializeData();
   }
 
-  // Ek sath dono APIs call karne ke liye
   Future<void> _initializeData() async {
-    await Future.wait([_fetchLockedUsers(), _fetchDrawSettings()]);
+    await Future.wait([
+      _fetchLockedUsers(),
+      _fetchDrawSettings(),
+      _fetchTicketStats(), // ✨ Stats API Call
+    ]);
     if (mounted) setState(() => _isLoading = false);
   }
 
-  // 🔒 Backend se locked users mangwana
+  // 🔒 Locked Users
   Future<void> _fetchLockedUsers() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-
       final response = await http.get(
         Uri.parse('${AppConstants.baseUrl}/admin/locked-users'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
-
       final data = jsonDecode(response.body);
       if (mounted && data['success'] == true) {
         setState(() {
@@ -69,20 +72,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  // 🎰 Backend se Draw Settings mangwana
+  // 🎰 Draw Settings
   Future<void> _fetchDrawSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-
       final response = await http.get(
         Uri.parse('${AppConstants.baseUrl}/admin/draw-settings'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
-
       final data = jsonDecode(response.body);
       if (mounted && data['success'] == true) {
         setState(() {
@@ -101,16 +99,56 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  // 🔓 Specific user ko unblock karna
-  Future<void> _unblockUser() async {
-    if (_selectedUserId == null) return;
-
-    setState(() => _isUnblocking = true);
-
+  // 📊 Ticket Statistics (Sold, Unsold, Repeating)
+  Future<void> _fetchTicketStats() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/admin/ticket-stats'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        List<dynamic> stats = data['stats'];
+        List<Map<String, dynamic>> sold = [];
+        List<Map<String, dynamic>> repeating = [];
+        Set<String> soldSet = {};
 
+        for (var s in stats) {
+          sold.add({'number': s['number'], 'count': s['count']});
+          soldSet.add(s['number'].toString());
+          if (s['count'] > 1) {
+            repeating.add({'number': s['number'], 'count': s['count']});
+          }
+        }
+
+        // Calculate Unsold Numbers (0000 to 9999)
+        List<String> unsold = [];
+        for (int i = 0; i <= 9999; i++) {
+          String numStr = i.toString().padLeft(4, '0');
+          if (!soldSet.contains(numStr)) unsold.add(numStr);
+        }
+
+        if (mounted) {
+          setState(() {
+            _soldNumbers = sold;
+            _repeatingNumbers = repeating;
+            _unsoldNumbers = unsold;
+          });
+        }
+      }
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<void> _unblockUser() async {
+    if (_selectedUserId == null) return;
+    setState(() => _isUnblocking = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/admin/unblock'),
         headers: {
@@ -119,12 +157,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         },
         body: jsonEncode({'userId': _selectedUserId}),
       );
-
       final data = jsonDecode(response.body);
-
       if (data['success'] == true) {
         _showSnackBar(data['message'] ?? 'User Unblocked!', Colors.green);
-        _fetchLockedUsers(); // Refresh
+        _fetchLockedUsers();
       } else {
         _showSnackBar(data['message'] ?? 'Action Failed.', Colors.redAccent);
       }
@@ -135,20 +171,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  // 🛠️ Admin Draw Settings Save Karna
   Future<void> _updateDrawSettings() async {
     final number = _drawNumberController.text.trim();
     if (number.length != 4) {
       _showSnackBar('Please enter exactly 4 digits!', Colors.redAccent);
       return;
     }
-
     setState(() => _isUpdatingDraw = true);
-
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/admin/draw-settings'),
         headers: {
@@ -157,9 +189,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         },
         body: jsonEncode({'nextWinningNumber': number, 'isRigged': _isRigged}),
       );
-
       final data = jsonDecode(response.body);
-
       if (data['success'] == true) {
         _showSnackBar(data['message'] ?? 'Settings Updated!', Colors.green);
       } else {
@@ -179,6 +209,184 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
+  }
+
+  // ✨ BOTTOM SHEET FOR TICKET LISTS
+  void _showStatsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E003E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: DefaultTabController(
+            length: 3,
+            child: Column(
+              children: [
+                const SizedBox(height: 15),
+                Container(
+                  width: 50,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white54,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                const Text(
+                  'MARKET OVERVIEW',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const TabBar(
+                  indicatorColor: Colors.cyanAccent,
+                  labelColor: Colors.cyanAccent,
+                  unselectedLabelColor: Colors.white54,
+                  tabs: [
+                    Tab(text: "SOLD"),
+                    Tab(text: "UNSOLD"),
+                    Tab(text: "REPEATING"),
+                  ],
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      // TAB 1: SOLD NUMBERS
+                      _soldNumbers.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No tickets sold yet.',
+                                style: TextStyle(color: Colors.white54),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(15),
+                              itemCount: _soldNumbers.length,
+                              itemBuilder: (context, index) {
+                                final item = _soldNumbers[index];
+                                return ListTile(
+                                  leading: const Icon(
+                                    Icons.receipt,
+                                    color: Colors.greenAccent,
+                                  ),
+                                  title: Text(
+                                    'Number: ${item['number']}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 20,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                  trailing: Text(
+                                    'Sold: ${item['count']}x',
+                                    style: const TextStyle(
+                                      color: Colors.greenAccent,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+
+                      // TAB 2: UNSOLD NUMBERS (Grid View for fast rendering)
+                      GridView.builder(
+                        padding: const EdgeInsets.all(15),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                              childAspectRatio: 2,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                            ),
+                        itemCount: _unsoldNumbers.length,
+                        itemBuilder: (context, index) {
+                          return Container(
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: Text(
+                              _unsoldNumbers[index],
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
+                      // TAB 3: REPEATING NUMBERS
+                      _repeatingNumbers.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No repeating numbers yet.',
+                                style: TextStyle(color: Colors.white54),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(15),
+                              itemCount: _repeatingNumbers.length,
+                              itemBuilder: (context, index) {
+                                final item = _repeatingNumbers[index];
+                                return ListTile(
+                                  leading: const Icon(
+                                    Icons.warning_amber,
+                                    color: Colors.orangeAccent,
+                                  ),
+                                  title: Text(
+                                    'Number: ${item['number']}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 20,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                  trailing: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orangeAccent.withOpacity(
+                                        0.2,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'Hot: ${item['count']}x',
+                                      style: const TextStyle(
+                                        color: Colors.orangeAccent,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -204,7 +412,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       body: Stack(
         children: [
-          // 🌌 Background Gradient
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -214,7 +421,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ),
           ),
-
           SafeArea(
             child: _isLoading
                 ? const Center(
@@ -225,10 +431,142 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 10),
+                        // ==========================================
+                        // 📊 1. LIVE TICKET STATS
+                        // ==========================================
+                        const Text(
+                          'LIVE TICKET STATS 📊',
+                          style: TextStyle(
+                            color: Colors.cyanAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(25),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                            child: Container(
+                              padding: const EdgeInsets.all(25),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.cyanAccent.withOpacity(0.5),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.cyanAccent.withOpacity(0.1),
+                                    blurRadius: 30,
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      Column(
+                                        children: [
+                                          const Text(
+                                            'SOLD',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_soldNumbers.length}',
+                                            style: const TextStyle(
+                                              color: Colors.greenAccent,
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Column(
+                                        children: [
+                                          const Text(
+                                            'UNSOLD',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_unsoldNumbers.length}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Column(
+                                        children: [
+                                          const Text(
+                                            'REPEATING',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_repeatingNumbers.length}',
+                                            style: const TextStyle(
+                                              color: Colors.orangeAccent,
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 25),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(
+                                          color: Colors.cyanAccent,
+                                          width: 2,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.list_alt,
+                                        color: Colors.cyanAccent,
+                                      ),
+                                      label: const Text(
+                                        'VIEW DETAILED LISTS',
+                                        style: TextStyle(
+                                          color: Colors.cyanAccent,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onPressed: _showStatsBottomSheet,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 40),
 
                         // ==========================================
-                        // 🎰 1. DRAW CONTROL (RIGGED SETTINGS)
+                        // 🎰 2. DRAW CONTROL (RIGGED SETTINGS)
                         // ==========================================
                         const Text(
                           'SYSTEM OVERRIDE 🎰',
@@ -288,8 +626,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 30),
-
-                                  // ✨ 4-Digit Number Input
                                   TextField(
                                     controller: _drawNumberController,
                                     keyboardType: TextInputType.number,
@@ -299,14 +635,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       fontSize: 45,
                                       fontWeight: FontWeight.w900,
                                       color: Colors.amberAccent,
-                                      letterSpacing:
-                                          15, // Digits ke beech space
+                                      letterSpacing: 15,
                                     ),
                                     inputFormatters: [
                                       FilteringTextInputFormatter.digitsOnly,
                                     ],
                                     decoration: InputDecoration(
-                                      counterText: "", // Hide 0/4 counter
+                                      counterText: "",
                                       filled: true,
                                       fillColor: Colors.black.withOpacity(0.3),
                                       border: OutlineInputBorder(
@@ -316,8 +651,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 15),
-
-                                  // ✨ Rigged Switch
                                   SwitchListTile(
                                     title: const Text(
                                       'Enable Rigged System',
@@ -343,8 +676,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     },
                                   ),
                                   const SizedBox(height: 15),
-
-                                  // 💾 UPDATE BUTTON
                                   SizedBox(
                                     width: double.infinity,
                                     height: 55,
@@ -389,7 +720,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         const SizedBox(height: 40),
 
                         // ==========================================
-                        // 🔒 2. SECURITY CONTROLS (LOCKED ACCOUNTS)
+                        // 🔒 3. SECURITY CONTROLS (LOCKED ACCOUNTS)
                         // ==========================================
                         const Text(
                           'SECURITY CONTROLS 🛡️',
@@ -451,9 +782,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 30),
-
                                   if (_lockedUsers.isNotEmpty) ...[
-                                    // ✨ DROPDOWN MENU
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 15,
@@ -497,8 +826,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 25),
-
-                                    // 🔓 UNBLOCK BUTTON
                                     SizedBox(
                                       width: double.infinity,
                                       height: 55,
@@ -536,7 +863,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       ),
                                     ),
                                   ] else ...[
-                                    // State when no users are locked
                                     Container(
                                       padding: const EdgeInsets.all(15),
                                       decoration: BoxDecoration(
