@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
+import 'dashboard_screen.dart'; // Impersonate karne ke baad idhar jayenge
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -32,6 +33,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<Map<String, dynamic>> _repeatingNumbers = [];
   List<String> _unsoldNumbers = [];
 
+  // User Management Variables
+  List<dynamic> _allUsers = [];
+
   @override
   void initState() {
     super.initState();
@@ -42,12 +46,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     await Future.wait([
       _fetchLockedUsers(),
       _fetchDrawSettings(),
-      _fetchTicketStats(), // ✨ Stats API Call
+      _fetchTicketStats(),
+      _fetchAllUsers(), // ✨ NAYA
     ]);
     if (mounted) setState(() => _isLoading = false);
   }
 
-  // 🔒 Locked Users
   Future<void> _fetchLockedUsers() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -67,12 +71,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           }
         });
       }
-    } catch (e) {
-      _showSnackBar('Network Error: Could not fetch users.', Colors.redAccent);
-    }
+    } catch (e) {}
   }
 
-  // 🎰 Draw Settings
   Future<void> _fetchDrawSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -91,15 +92,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               : '0000';
         });
       }
-    } catch (e) {
-      _showSnackBar(
-        'Network Error: Could not fetch draw settings.',
-        Colors.amber,
-      );
-    }
+    } catch (e) {}
   }
 
-  // 📊 Ticket Statistics (Sold, Unsold, Repeating)
   Future<void> _fetchTicketStats() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -122,14 +117,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             repeating.add({'number': s['number'], 'count': s['count']});
           }
         }
-
-        // Calculate Unsold Numbers (0000 to 9999)
         List<String> unsold = [];
         for (int i = 0; i <= 9999; i++) {
           String numStr = i.toString().padLeft(4, '0');
           if (!soldSet.contains(numStr)) unsold.add(numStr);
         }
-
         if (mounted) {
           setState(() {
             _soldNumbers = sold;
@@ -138,9 +130,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           });
         }
       }
-    } catch (e) {
-      print(e);
-    }
+    } catch (e) {}
+  }
+
+  // ✨ ALL USERS FETCH KARNA
+  Future<void> _fetchAllUsers() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/admin/users'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      final data = jsonDecode(response.body);
+      if (mounted && data['success'] == true) {
+        setState(() => _allUsers = data['users']);
+      }
+    } catch (e) {}
   }
 
   Future<void> _unblockUser() async {
@@ -211,7 +217,427 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
-  // ✨ BOTTOM SHEET FOR TICKET LISTS
+  // ========================================================
+  // 👥 USER MANAGEMENT VIP BOTTOM SHEET
+  // ========================================================
+  void _showUserManagementSheet() {
+    String searchQuery = '';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setSheetState) {
+            final filteredUsers = _allUsers.where((u) {
+              final un = u['username'].toString().toLowerCase();
+              return un.contains(searchQuery.toLowerCase());
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.9,
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E003E),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 15),
+                  Container(
+                    width: 50,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.white54,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  const Text(
+                    'MANAGE USERS 👥',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Search Bar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TextField(
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Search by username...',
+                        hintStyle: const TextStyle(color: Colors.white38),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Colors.cyanAccent,
+                        ),
+                        filled: true,
+                        fillColor: Colors.black.withOpacity(0.3),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (val) {
+                        setSheetState(() {
+                          searchQuery = val;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Users List
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(15),
+                      itemCount: filteredUsers.length,
+                      itemBuilder: (context, index) {
+                        final user = filteredUsers[index];
+                        final wallets = user['wallets'] ?? {};
+                        final playBal = (wallets['deposit'] ?? 0).toDouble();
+                        final winBal = (wallets['win'] ?? 0).toDouble();
+
+                        return Card(
+                          color: Colors.white.withOpacity(0.05),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            side: const BorderSide(color: Colors.white12),
+                          ),
+                          child: ListTile(
+                            leading: const CircleAvatar(
+                              backgroundColor: Colors.cyanAccent,
+                              child: Icon(Icons.person, color: Colors.black),
+                            ),
+                            title: Text(
+                              user['username'].toString().toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Play: Rs. ${playBal.toStringAsFixed(0)} | Win: Rs. ${winBal.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: PopupMenuButton<String>(
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: Colors.white,
+                              ),
+                              color: const Color(0xFF2A004F),
+                              onSelected: (value) {
+                                if (value == 'login') {
+                                  _loginAsUser(user['_id'], user['username']);
+                                } else if (value == 'password') {
+                                  _showChangePasswordDialog(
+                                    user['_id'],
+                                    user['username'],
+                                  );
+                                } else if (value == 'funds') {
+                                  _showManageFundsDialog(user, setSheetState);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'login',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.dashboard,
+                                        color: Colors.greenAccent,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'View Dashboard',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'password',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.vpn_key,
+                                        color: Colors.amberAccent,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'Change Password',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'funds',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.account_balance_wallet,
+                                        color: Colors.pinkAccent,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'Manage Funds',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 1. View Dashboard (Login As)
+  Future<void> _loginAsUser(String userId, String username) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/admin/user/login-as'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'userId': userId}),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        await prefs.setString('auth_token', data['token']);
+        _showSnackBar(
+          'Logged in as $username! Logout to return to Admin.',
+          Colors.green,
+        );
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          (route) => false,
+        );
+      } else {
+        _showSnackBar(data['message'] ?? 'Failed to login', Colors.redAccent);
+      }
+    } catch (e) {
+      _showSnackBar('Network Error', Colors.redAccent);
+    }
+  }
+
+  // 2. Change Password Dialog
+  void _showChangePasswordDialog(String userId, String username) {
+    final passwordController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E003E),
+          title: Text(
+            'Change Password for $username',
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+          ),
+          content: TextField(
+            controller: passwordController,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              hintText: 'Enter new password',
+              hintStyle: TextStyle(color: Colors.white38),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amberAccent,
+              ),
+              onPressed: () async {
+                Navigator.pop(context);
+                if (passwordController.text.isEmpty) return;
+
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('auth_token');
+                final response = await http.post(
+                  Uri.parse(
+                    '${AppConstants.baseUrl}/admin/user/change-password',
+                  ),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
+                  body: jsonEncode({
+                    'userId': userId,
+                    'newPassword': passwordController.text,
+                  }),
+                );
+                final data = jsonDecode(response.body);
+                if (data['success'] == true) {
+                  _showSnackBar(data['message'], Colors.green);
+                } else {
+                  _showSnackBar(data['message'], Colors.redAccent);
+                }
+              },
+              child: const Text('SAVE', style: TextStyle(color: Colors.black)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 3. Manage Funds Dialog
+  void _showManageFundsDialog(
+    Map<String, dynamic> user,
+    StateSetter setSheetState,
+  ) {
+    final amountController = TextEditingController();
+    String selectedWallet = 'deposit';
+    String selectedAction = 'add';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E003E),
+              title: Text(
+                'Manage Funds for ${user['username']}',
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selectedWallet,
+                    dropdownColor: const Color(0xFF2A004F),
+                    style: const TextStyle(color: Colors.white),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'deposit',
+                        child: Text('Play Balance (Deposit)'),
+                      ),
+                      DropdownMenuItem(value: 'win', child: Text('Win Wallet')),
+                      DropdownMenuItem(
+                        value: 'bonus',
+                        child: Text('Bonus Wallet'),
+                      ),
+                    ],
+                    onChanged: (val) =>
+                        setDialogState(() => selectedWallet = val!),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: selectedAction,
+                    dropdownColor: const Color(0xFF2A004F),
+                    style: const TextStyle(color: Colors.white),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'add',
+                        child: Text('ADD Funds 🟢'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'deduct',
+                        child: Text('DEDUCT Funds 🔴'),
+                      ),
+                    ],
+                    onChanged: (val) =>
+                        setDialogState(() => selectedAction = val!),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Enter amount (Rs.)',
+                      hintStyle: TextStyle(color: Colors.white38),
+                      prefixText: 'Rs. ',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: selectedAction == 'add'
+                        ? Colors.greenAccent
+                        : Colors.redAccent,
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    if (amountController.text.isEmpty) return;
+
+                    final prefs = await SharedPreferences.getInstance();
+                    final token = prefs.getString('auth_token');
+                    final response = await http.post(
+                      Uri.parse(
+                        '${AppConstants.baseUrl}/admin/user/adjust-balance',
+                      ),
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer $token',
+                      },
+                      body: jsonEncode({
+                        'userId': user['_id'],
+                        'walletType': selectedWallet,
+                        'amount': amountController.text,
+                        'action': selectedAction,
+                      }),
+                    );
+                    final data = jsonDecode(response.body);
+                    if (data['success'] == true) {
+                      _showSnackBar(data['message'], Colors.green);
+                      _fetchAllUsers(); // Refresh background list
+                    } else {
+                      _showSnackBar(data['message'], Colors.redAccent);
+                    }
+                  },
+                  child: Text('CONFIRM', style: TextStyle(color: Colors.black)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showStatsBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -261,7 +687,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Expanded(
                   child: TabBarView(
                     children: [
-                      // TAB 1: SOLD NUMBERS
                       _soldNumbers.isEmpty
                           ? const Center(
                               child: Text(
@@ -298,8 +723,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 );
                               },
                             ),
-
-                      // TAB 2: UNSOLD NUMBERS (Grid View for fast rendering)
                       GridView.builder(
                         padding: const EdgeInsets.all(15),
                         gridDelegate:
@@ -328,8 +751,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           );
                         },
                       ),
-
-                      // TAB 3: REPEATING NUMBERS
                       _repeatingNumbers.isEmpty
                           ? const Center(
                               child: Text(
@@ -432,7 +853,104 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ==========================================
-                        // 📊 1. LIVE TICKET STATS
+                        // 👥 1. USER MANAGEMENT SECTION
+                        // ==========================================
+                        const Text(
+                          'USER MANAGEMENT 👥',
+                          style: TextStyle(
+                            color: Colors.pinkAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(25),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                            child: Container(
+                              padding: const EdgeInsets.all(25),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.pinkAccent.withOpacity(0.5),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.pinkAccent.withOpacity(0.1),
+                                    blurRadius: 30,
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  const Icon(
+                                    Icons.manage_accounts,
+                                    size: 60,
+                                    color: Colors.pinkAccent,
+                                  ),
+                                  const SizedBox(height: 15),
+                                  const Text(
+                                    'ALL PLAYERS',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Total Users Registered: ${_allUsers.length}',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 25),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(
+                                          color: Colors.pinkAccent,
+                                          width: 2,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.people,
+                                        color: Colors.pinkAccent,
+                                      ),
+                                      label: const Text(
+                                        'VIEW & MANAGE USERS',
+                                        style: TextStyle(
+                                          color: Colors.pinkAccent,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onPressed: _showUserManagementSheet,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+
+                        // ==========================================
+                        // 📊 2. LIVE TICKET STATS
                         // ==========================================
                         const Text(
                           'LIVE TICKET STATS 📊',
@@ -562,11 +1080,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 40),
 
                         // ==========================================
-                        // 🎰 2. DRAW CONTROL (RIGGED SETTINGS)
+                        // 🎰 3. DRAW CONTROL (RIGGED SETTINGS)
                         // ==========================================
                         const Text(
                           'SYSTEM OVERRIDE 🎰',
@@ -716,11 +1233,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 40),
 
                         // ==========================================
-                        // 🔒 3. SECURITY CONTROLS (LOCKED ACCOUNTS)
+                        // 🔒 4. SECURITY CONTROLS (LOCKED ACCOUNTS)
                         // ==========================================
                         const Text(
                           'SECURITY CONTROLS 🛡️',

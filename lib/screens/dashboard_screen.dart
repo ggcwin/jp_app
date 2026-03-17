@@ -4,10 +4,9 @@ import 'package:lottie/lottie.dart';
 import '../services/auth_service.dart';
 import 'play_screen.dart';
 import 'my_tickets_screen.dart';
-import 'deposit_screen.dart';
-import 'withdraw_screen.dart';
 import 'create_voucher_screen.dart';
-import 'profile_screen.dart'; // ✨ NAYA IMPORT: Profile Screen ke liye
+import 'profile_screen.dart';
+import 'wallet_details_screen.dart'; // ✨ NAYA IMPORT
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -79,7 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     String amount,
     Color neonColor,
     IconData icon,
-    VoidCallback? onTap, // ✨ Tap logic added
+    VoidCallback? onTap,
   ) {
     return Expanded(
       child: GestureDetector(
@@ -152,7 +151,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
 
     final user = _userData?['user'];
+    final userId = user?['_id'] ?? '';
     final username = user?['username']?.toString().toUpperCase() ?? 'BOSS';
+    final rawUsername = user?['username']?.toString() ?? 'boss';
 
     final playBalance = (user?['wallets']?['deposit'] ?? 0.0).toDouble();
     final winBalance = (user?['wallets']?['win'] ?? 0.0).toDouble();
@@ -191,7 +192,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                     children: [
                       Row(
                         children: [
-                          // ✨ PROFILE SCREEN NAVIGATION
                           GestureDetector(
                             onTap: () {
                               Navigator.push(
@@ -356,7 +356,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Text(
-                                      // ✨ PKR Formatting applied here
                                       'Rs. ${winBalance.toStringAsFixed(2)}',
                                       style: const TextStyle(
                                         fontSize: 55,
@@ -395,10 +394,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                   ),
                   const SizedBox(height: 15),
+
+                  // ✨ NAYA LOGIC: Sary wallets clickable ho gaye hain
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      // ✨ PKR Formatting applied in all wallets below
                       _buildGlassWallet(
                         'PLAY BALANCE',
                         'Rs. ${playBalance.toStringAsFixed(2)}',
@@ -407,7 +407,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                         () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const DepositScreen(),
+                            builder: (_) => WalletDetailsScreen(
+                              walletType: 'deposit',
+                              title: 'PLAY BALANCE',
+                              balance: playBalance,
+                              username: rawUsername,
+                              userId: userId,
+                              themeColor: Colors.greenAccent,
+                            ),
                           ),
                         ),
                       ),
@@ -419,7 +426,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                         () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const WithdrawScreen(),
+                            builder: (_) => WalletDetailsScreen(
+                              walletType: 'win',
+                              title: 'WIN WALLET',
+                              balance: winBalance,
+                              username: rawUsername,
+                              userId: userId,
+                              themeColor: Colors.pinkAccent,
+                            ),
                           ),
                         ),
                       ),
@@ -428,7 +442,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                         'Rs. ${bonusBalance.toStringAsFixed(2)}',
                         Colors.cyanAccent,
                         Icons.card_giftcard,
-                        null,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => WalletDetailsScreen(
+                              walletType: 'bonus',
+                              title: 'BONUS WALLET',
+                              balance: bonusBalance,
+                              username: rawUsername,
+                              userId: userId,
+                              themeColor: Colors.cyanAccent,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -494,7 +520,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                   const SizedBox(height: 15),
 
-                  // ✨ P2P Voucher Button
                   SizedBox(
                     width: double.infinity,
                     height: 55,
