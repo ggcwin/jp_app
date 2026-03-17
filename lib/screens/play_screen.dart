@@ -2,9 +2,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'ticket_receipt_screen.dart';
-import 'deposit_screen.dart'; // ✨ Deposit Screen import ki
+import 'deposit_screen.dart';
 import '../services/ticket_service.dart';
-import '../services/auth_service.dart'; // ✨ Live Balance lene ke liye
+import '../services/auth_service.dart';
 
 class PlayScreen extends StatefulWidget {
   const PlayScreen({super.key});
@@ -22,18 +22,16 @@ class _PlayScreenState extends State<PlayScreen> {
   int _ticketQuantity = 1;
   bool _isLoading = false;
 
-  // ✨ WALLET SYSTEM VARIABLES
   Map<String, dynamic>? _wallets;
   bool _isFetchingWallets = true;
-  String _selectedWallet = 'deposit'; // Default: Play Balance
+  String _selectedWallet = 'deposit';
 
   @override
   void initState() {
     super.initState();
-    _fetchWallets(); // Screen khulte hi wallet balance le aao
+    _fetchWallets();
   }
 
-  // Live balance fetch karne ka function
   void _fetchWallets() async {
     final data = await AuthService.getUserData();
     if (mounted) {
@@ -101,7 +99,8 @@ class _PlayScreenState extends State<PlayScreen> {
           if (_rowsTypes[i]['mixFix'] == true) c++;
           multiplier = c > 0 ? c : 0;
         }
-        price += 0.035 * multiplier * _ticketQuantity;
+        // ✨ NAYA LOGIC: Ticket Price Fixed to Rs. 5.0
+        price += 5.0 * multiplier * _ticketQuantity;
       }
     }
     return price;
@@ -110,7 +109,6 @@ class _PlayScreenState extends State<PlayScreen> {
   Future<void> _buyTicket() async {
     if (_selectedGame == null) return;
 
-    // ✨ WALLET BALANCE CHECK
     double availableBalance = (_wallets?[_selectedWallet] ?? 0.0).toDouble();
     if (availableBalance < _currentPrice) {
       _showInsufficientBalanceDialog();
@@ -197,12 +195,11 @@ class _PlayScreenState extends State<PlayScreen> {
 
     setState(() => _isLoading = true);
 
-    // ✨ API CALL WITH SELECTED WALLET
     final response = await TicketService.buyTicket(
       gameType: _selectedGame!,
       quantity: _ticketQuantity,
       lines: backendLinesData,
-      walletType: _selectedWallet, // Backend ko wallet type bhej diya
+      walletType: _selectedWallet,
     );
 
     setState(() => _isLoading = false);
@@ -241,7 +238,6 @@ class _PlayScreenState extends State<PlayScreen> {
     }
   }
 
-  // ✨ VIP INSUFFICIENT BALANCE DIALOG
   void _showInsufficientBalanceDialog() {
     showDialog(
       context: context,
@@ -271,7 +267,8 @@ class _PlayScreenState extends State<PlayScreen> {
             ],
           ),
           content: Text(
-            'Your selected wallet does not have enough balance to purchase this ticket (\$${_currentPrice.toStringAsFixed(3)} required).',
+            // ✨ FIX: Rs. formatting
+            'Your selected wallet does not have enough balance to purchase this ticket (Rs. ${_currentPrice.toStringAsFixed(2)} required).',
             style: const TextStyle(color: Colors.white70),
           ),
           actions: [
@@ -291,11 +288,11 @@ class _PlayScreenState extends State<PlayScreen> {
                 ),
               ),
               onPressed: () {
-                Navigator.pop(context); // Close dialog
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const DepositScreen()),
-                ); // ✨ Go to Deposit Screen
+                );
               },
               child: const Text(
                 'TOP UP NOW',
@@ -308,7 +305,6 @@ class _PlayScreenState extends State<PlayScreen> {
     );
   }
 
-  // ✨ WALLET SELECTOR WIDGET
   Widget _buildWalletSelector(
     String type,
     String title,
@@ -348,8 +344,9 @@ class _PlayScreenState extends State<PlayScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                // ✨ FIX: Rs. formatting
                 Text(
-                  '\$${balance.toStringAsFixed(2)}',
+                  'Rs. ${balance.toStringAsFixed(2)}',
                   style: TextStyle(
                     color: color,
                     fontSize: 12,
@@ -662,7 +659,6 @@ class _PlayScreenState extends State<PlayScreen> {
 
                   const SizedBox(height: 30),
 
-                  // ✨ CHECKOUT BOX WITH WALLET SELECTOR
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: BackdropFilter(
@@ -676,7 +672,6 @@ class _PlayScreenState extends State<PlayScreen> {
                         ),
                         child: Column(
                           children: [
-                            // Quantity Controls
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -720,7 +715,6 @@ class _PlayScreenState extends State<PlayScreen> {
                             ),
                             const Divider(color: Colors.white24, height: 25),
 
-                            // ✨ WALLET SELECTION ROW
                             const Align(
                               alignment: Alignment.centerLeft,
                               child: Text(
@@ -771,7 +765,6 @@ class _PlayScreenState extends State<PlayScreen> {
 
                             const SizedBox(height: 20),
 
-                            // Buy Button
                             SizedBox(
                               width: double.infinity,
                               height: 55,
@@ -790,8 +783,9 @@ class _PlayScreenState extends State<PlayScreen> {
                                     ? const CircularProgressIndicator(
                                         color: Colors.black,
                                       )
+                                    // ✨ FIX: Rs. formatting applied
                                     : Text(
-                                        'GET NOW (\$${_currentPrice.toStringAsFixed(3)})',
+                                        'GET NOW (Rs. ${_currentPrice.toStringAsFixed(2)})',
                                         style: const TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,

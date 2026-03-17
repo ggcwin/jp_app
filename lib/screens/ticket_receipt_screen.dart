@@ -160,20 +160,21 @@ class TicketReceiptScreen extends StatelessWidget {
                               ),
                               child: Column(
                                 children: [
+                                  // ✨ NAYA LOGIC: Rs. symbol and formatting applied
                                   _buildInvoiceRow(
                                     'Est. Win Amount:',
-                                    '\$${winAmount.toStringAsFixed(2)}',
+                                    'Rs. ${winAmount.toStringAsFixed(2)}',
                                     isHighlight: true,
                                   ),
                                   const Divider(color: Colors.white12),
                                   _buildInvoiceRow(
                                     'Sponsor ($sponsorUsername):',
-                                    '+ \$${sponsorCut.toStringAsFixed(2)}',
+                                    '+ Rs. ${sponsorCut.toStringAsFixed(2)}',
                                     isSubText: true,
                                   ),
                                   _buildInvoiceRow(
                                     'G. Sponsor ($grandSponsorUsername):',
-                                    '+ \$${grandSponsorCut.toStringAsFixed(2)}',
+                                    '+ Rs. ${grandSponsorCut.toStringAsFixed(2)}',
                                     isSubText: true,
                                   ),
                                 ],
@@ -200,7 +201,6 @@ class TicketReceiptScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 10),
 
-                            // ✨ MULTI-LINE FONT SIZE FIX
                             Text(
                               ticketNumber,
                               textAlign: TextAlign.center,
@@ -223,9 +223,10 @@ class TicketReceiptScreen extends StatelessWidget {
                             const _DashedDivider(),
                             const SizedBox(height: 20),
 
+                            // ✨ NAYA LOGIC: Rs. formatting applied
                             _buildInvoiceRow(
                               'Total Paid:',
-                              '\$${amount.toStringAsFixed(3)}',
+                              'Rs. ${amount.toStringAsFixed(2)}',
                               isHighlight: true,
                             ),
                             _buildInvoiceRow('Status:', 'PAID SUCCESS'),

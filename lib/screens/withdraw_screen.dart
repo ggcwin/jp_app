@@ -50,12 +50,15 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   }
 
   void _handleWithdraw() async {
-    // ✨ FIX: Rs. replace kiya gaya hai
-    final amountText = _amountController.text.replaceAll('Rs.', '').trim();
+    // ✨ FIX: Dollar sign aur Rs. dono ko handle kar liya
+    final amountText = _amountController.text
+        .replaceAll('\$', '')
+        .replaceAll('Rs.', '')
+        .trim();
     final amount = double.tryParse(amountText);
     final address = _addressController.text.trim();
 
-    // ✨ FIX: Minimum limit Rs. 500 kar di gayi hai
+    // ✨ FIX: Minimum limit Rs. 500 set kar di
     if (amount == null || amount < 500) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -253,7 +256,8 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                           ),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 45, // Thora chota kiya fit karne ke liye
+                            fontSize:
+                                40, // ✨ Size thora adjust kiya taake fit ho jaye
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                           ),
@@ -261,7 +265,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                             border: InputBorder.none,
                             hintText: '0.00',
                             hintStyle: TextStyle(color: Colors.white24),
-                            // ✨ FIX: Prefix ab Rs. hai
+                            // ✨ FIX: Prefix Rs.
                             prefixText: 'Rs. ',
                             prefixStyle: TextStyle(
                               fontSize: 35,

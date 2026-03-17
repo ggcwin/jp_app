@@ -38,7 +38,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     List<dynamic> chosenNumbers = ticket['chosenNumbers'] ?? [];
     String receiptCode = ticket['receiptCode'] ?? '#000000';
     double price = (ticket['price'] ?? 0.0).toDouble();
-    bool isWon = ticket['isWon'] ?? false; // Future Admin Update ke liye
+    bool isWon = ticket['isWon'] ?? false;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
@@ -115,7 +115,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // ✨ FIX: Dollar ki jagah Rs. aur 2 decimal places lagaye gaye hain
+                    // ✨ FIX: Rs. formatting applied
                     Text(
                       'Rs. ${price.toStringAsFixed(2)}',
                       style: const TextStyle(
