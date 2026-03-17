@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
-import 'dashboard_screen.dart'; // Impersonate karne ke baad idhar jayenge
+import 'dashboard_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -15,26 +15,31 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  // Locked Accounts Variables
+  // Locked Accounts
   List<dynamic> _lockedUsers = [];
   String? _selectedUserId;
   bool _isLoading = true;
   bool _isUnblocking = false;
 
-  // Draw Control Variables
+  // Draw Control
   final TextEditingController _drawNumberController = TextEditingController(
     text: "0000",
   );
   bool _isRigged = false;
   bool _isUpdatingDraw = false;
 
-  // Ticket Stats Variables
+  // Ticket Stats
   List<Map<String, dynamic>> _soldNumbers = [];
   List<Map<String, dynamic>> _repeatingNumbers = [];
   List<String> _unsoldNumbers = [];
 
-  // User Management Variables
+  // User Management
   List<dynamic> _allUsers = [];
+
+  // Finance Approvals & Ledger
+  List<dynamic> _pendingDeposits = [];
+  List<dynamic> _pendingWithdrawals = [];
+  List<dynamic> _globalHistory = []; // Global Ledger History
 
   @override
   void initState() {
@@ -47,9 +52,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _fetchLockedUsers(),
       _fetchDrawSettings(),
       _fetchTicketStats(),
-      _fetchAllUsers(), // ✨ NAYA
+      _fetchAllUsers(),
+      _fetchFinanceRequests(),
     ]);
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  // ==========================================
+  // 📥 API FETCH FUNCTIONS
+  // ==========================================
+  Future<void> _fetchFinanceRequests() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+
+      // 1. Pending Deposits
+      final depRes = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/wallet/admin/pending-deposits'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (depRes.statusCode == 200) {
+        setState(() => _pendingDeposits = jsonDecode(depRes.body));
+      }
+
+      // 2. Pending Withdrawals
+      final withRes = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/withdraw/all'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (withRes.statusCode == 200) {
+        List<dynamic> allRequests = jsonDecode(withRes.body);
+        setState(() {
+          _pendingWithdrawals = allRequests
+              .where((r) => r['status'] == 'Pending')
+              .toList();
+        });
+      }
+
+      // ✨ 3. Global Ledger / History (Updated with NAYA Route)
+      final histRes = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/admin/ledger'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (histRes.statusCode == 200) {
+        final data = jsonDecode(histRes.body);
+        if (data['success'] == true) {
+          setState(() => _globalHistory = data['history'] ?? []);
+        }
+      }
+    } catch (e) {
+      print(e);
+    }
   }
 
   Future<void> _fetchLockedUsers() async {
@@ -64,11 +117,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (mounted && data['success'] == true) {
         setState(() {
           _lockedUsers = data['users'] ?? [];
-          if (_lockedUsers.isNotEmpty) {
-            _selectedUserId = _lockedUsers[0]['_id'];
-          } else {
-            _selectedUserId = null;
-          }
+          if (_lockedUsers.isNotEmpty) _selectedUserId = _lockedUsers[0]['_id'];
         });
       }
     } catch (e) {}
@@ -113,9 +162,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         for (var s in stats) {
           sold.add({'number': s['number'], 'count': s['count']});
           soldSet.add(s['number'].toString());
-          if (s['count'] > 1) {
+          if (s['count'] > 1)
             repeating.add({'number': s['number'], 'count': s['count']});
-          }
         }
         List<String> unsold = [];
         for (int i = 0; i <= 9999; i++) {
@@ -133,7 +181,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {}
   }
 
-  // ✨ ALL USERS FETCH KARNA
   Future<void> _fetchAllUsers() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -147,6 +194,56 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         setState(() => _allUsers = data['users']);
       }
     } catch (e) {}
+  }
+
+  // ==========================================
+  // ⚙️ ACTION FUNCTIONS
+  // ==========================================
+
+  Future<void> _approveDeposit(String transactionId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/wallet/admin/approve-deposit'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'transactionId': transactionId}),
+      );
+      final data = jsonDecode(response.body);
+      _showSnackBar(
+        data['message'],
+        response.statusCode == 200 ? Colors.green : Colors.red,
+      );
+      if (response.statusCode == 200) _fetchFinanceRequests(); // Refresh
+    } catch (e) {
+      _showSnackBar('Network Error', Colors.redAccent);
+    }
+  }
+
+  Future<void> _handleWithdrawAction(String requestId, String action) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/withdraw/action'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'requestId': requestId, 'action': action}),
+      );
+      final data = jsonDecode(response.body);
+      _showSnackBar(
+        data['message'],
+        response.statusCode == 200 ? Colors.green : Colors.red,
+      );
+      if (response.statusCode == 200) _fetchFinanceRequests(); // Refresh
+    } catch (e) {
+      _showSnackBar('Network Error', Colors.redAccent);
+    }
   }
 
   Future<void> _unblockUser() async {
@@ -171,7 +268,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _showSnackBar(data['message'] ?? 'Action Failed.', Colors.redAccent);
       }
     } catch (e) {
-      _showSnackBar('Network Error: Could not unblock.', Colors.redAccent);
+      _showSnackBar('Network Error', Colors.redAccent);
     } finally {
       if (mounted) setState(() => _isUnblocking = false);
     }
@@ -202,10 +299,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _showSnackBar(data['message'] ?? 'Failed to update!', Colors.redAccent);
       }
     } catch (e) {
-      _showSnackBar(
-        'Network Error: Could not update settings.',
-        Colors.redAccent,
-      );
+      _showSnackBar('Network Error', Colors.redAccent);
     } finally {
       if (mounted) setState(() => _isUpdatingDraw = false);
     }
@@ -218,7 +312,322 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // ========================================================
-  // 👥 USER MANAGEMENT VIP BOTTOM SHEET
+  // 💰 FINANCE BOTTOM SHEET (WITH 3 TABS)
+  // ========================================================
+  void _showFinanceBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setSheetState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E003E),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: DefaultTabController(
+                length: 3,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 15),
+                    Container(
+                      width: 50,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.white54,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    const Text(
+                      'FINANCE APPROVALS 💰',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const TabBar(
+                      indicatorColor: Colors.greenAccent,
+                      labelColor: Colors.greenAccent,
+                      unselectedLabelColor: Colors.white54,
+                      isScrollable: true,
+                      tabs: [
+                        Tab(text: "DEPOSITS"),
+                        Tab(text: "WITHDRAWALS"),
+                        Tab(text: "LEDGER / HISTORY"),
+                      ],
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          // TAB 1: PENDING DEPOSITS
+                          _pendingDeposits.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'No pending deposits.',
+                                    style: TextStyle(color: Colors.white54),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: const EdgeInsets.all(15),
+                                  itemCount: _pendingDeposits.length,
+                                  itemBuilder: (context, index) {
+                                    final req = _pendingDeposits[index];
+                                    final username = req['userId'] != null
+                                        ? req['userId']['username']
+                                        : 'Unknown';
+                                    return Card(
+                                      color: Colors.white.withOpacity(0.05),
+                                      child: ListTile(
+                                        title: Text(
+                                          'User: $username',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          'Amount: Rs. ${req['amount']}\n${req['details']}',
+                                          style: const TextStyle(
+                                            color: Colors.greenAccent,
+                                          ),
+                                        ),
+                                        trailing: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.greenAccent,
+                                          ),
+                                          child: const Text(
+                                            'APPROVE',
+                                            style: TextStyle(
+                                              color: Colors.black,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                            _approveDeposit(req['_id']);
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+
+                          // TAB 2: PENDING WITHDRAWALS
+                          _pendingWithdrawals.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'No pending withdrawals.',
+                                    style: TextStyle(color: Colors.white54),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: const EdgeInsets.all(15),
+                                  itemCount: _pendingWithdrawals.length,
+                                  itemBuilder: (context, index) {
+                                    final req = _pendingWithdrawals[index];
+                                    final username = req['userId'] != null
+                                        ? req['userId']['username']
+                                        : 'Unknown';
+                                    return Card(
+                                      color: Colors.white.withOpacity(0.05),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(10.0),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'User: $username',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              'Req: Rs. ${req['amount']} | Fee: Rs. ${req['fee']}',
+                                              style: const TextStyle(
+                                                color: Colors.redAccent,
+                                              ),
+                                            ),
+                                            Text(
+                                              'To Send: Rs. ${req['finalAmount']}',
+                                              style: const TextStyle(
+                                                color: Colors.greenAccent,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              'Method: ${req['method']}',
+                                              style: const TextStyle(
+                                                color: Colors.white54,
+                                              ),
+                                            ),
+                                            Text(
+                                              'Details: ${req['accountDetails']}',
+                                              style: const TextStyle(
+                                                color: Colors.white54,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.end,
+                                              children: [
+                                                TextButton(
+                                                  onPressed: () {
+                                                    Navigator.pop(context);
+                                                    _handleWithdrawAction(
+                                                      req['_id'],
+                                                      'Rejected',
+                                                    );
+                                                  },
+                                                  child: const Text(
+                                                    'REJECT',
+                                                    style: TextStyle(
+                                                      color: Colors.redAccent,
+                                                    ),
+                                                  ),
+                                                ),
+                                                ElevatedButton(
+                                                  style:
+                                                      ElevatedButton.styleFrom(
+                                                        backgroundColor:
+                                                            Colors.greenAccent,
+                                                      ),
+                                                  child: const Text(
+                                                    'APPROVE',
+                                                    style: TextStyle(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  onPressed: () {
+                                                    Navigator.pop(context);
+                                                    _handleWithdrawAction(
+                                                      req['_id'],
+                                                      'Approved',
+                                                    );
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+
+                          // ✨ TAB 3: GLOBAL LEDGER HISTORY
+                          _globalHistory.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'No history available.',
+                                    style: TextStyle(color: Colors.white54),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: const EdgeInsets.all(15),
+                                  itemCount: _globalHistory.length,
+                                  itemBuilder: (context, index) {
+                                    final tx = _globalHistory[index];
+                                    // ✨ Yahan ab directly username show hoga!
+                                    final username = tx['userId'] != null
+                                        ? tx['userId']['username']
+                                        : 'System';
+                                    final type =
+                                        tx['type']?.toString().toUpperCase() ??
+                                        'N/A';
+                                    final amount = tx['amount'] ?? 0;
+                                    final status =
+                                        tx['status']
+                                            ?.toString()
+                                            .toUpperCase() ??
+                                        'COMPLETED';
+                                    final details =
+                                        tx['details'] ?? 'No details';
+
+                                    Color statusColor = Colors.greenAccent;
+                                    if (status == 'PENDING')
+                                      statusColor = Colors.orangeAccent;
+                                    if (status == 'REJECTED')
+                                      statusColor = Colors.redAccent;
+
+                                    return Card(
+                                      color: Colors.white.withOpacity(0.05),
+                                      child: ListTile(
+                                        leading: CircleAvatar(
+                                          backgroundColor: statusColor
+                                              .withOpacity(0.2),
+                                          child: Icon(
+                                            Icons.history,
+                                            color: statusColor,
+                                          ),
+                                        ),
+                                        title: Text(
+                                          'User: $username',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        subtitle: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const SizedBox(height: 5),
+                                            Text(
+                                              '$type | Rs. $amount',
+                                              style: const TextStyle(
+                                                color: Colors.cyanAccent,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              details,
+                                              style: const TextStyle(
+                                                color: Colors.white54,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        trailing: Text(
+                                          status,
+                                          style: TextStyle(
+                                            color: statusColor,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ========================================================
+  // 👥 USER MANAGEMENT BOTTOM SHEET
   // ========================================================
   void _showUserManagementSheet() {
     String searchQuery = '';
@@ -262,8 +671,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-
-                  // Search Bar
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: TextField(
@@ -290,8 +697,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-
-                  // Users List
                   Expanded(
                     child: ListView.builder(
                       padding: const EdgeInsets.all(15),
@@ -334,16 +739,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ),
                               color: const Color(0xFF2A004F),
                               onSelected: (value) {
-                                if (value == 'login') {
+                                if (value == 'login')
                                   _loginAsUser(user['_id'], user['username']);
-                                } else if (value == 'password') {
+                                else if (value == 'password')
                                   _showChangePasswordDialog(
                                     user['_id'],
                                     user['username'],
                                   );
-                                } else if (value == 'funds') {
+                                else if (value == 'funds')
                                   _showManageFundsDialog(user, setSheetState);
-                                }
                               },
                               itemBuilder: (context) => [
                                 const PopupMenuItem(
@@ -413,7 +817,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // 1. View Dashboard (Login As)
   Future<void> _loginAsUser(String userId, String username) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -447,7 +850,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  // 2. Change Password Dialog
   void _showChangePasswordDialog(String userId, String username) {
     final passwordController = TextEditingController();
     showDialog(
@@ -482,7 +884,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               onPressed: () async {
                 Navigator.pop(context);
                 if (passwordController.text.isEmpty) return;
-
                 final prefs = await SharedPreferences.getInstance();
                 final token = prefs.getString('auth_token');
                 final response = await http.post(
@@ -499,11 +900,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   }),
                 );
                 final data = jsonDecode(response.body);
-                if (data['success'] == true) {
-                  _showSnackBar(data['message'], Colors.green);
-                } else {
-                  _showSnackBar(data['message'], Colors.redAccent);
-                }
+                _showSnackBar(
+                  data['message'],
+                  data['success'] == true ? Colors.green : Colors.redAccent,
+                );
               },
               child: const Text('SAVE', style: TextStyle(color: Colors.black)),
             ),
@@ -513,7 +913,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // 3. Manage Funds Dialog
   void _showManageFundsDialog(
     Map<String, dynamic> user,
     StateSetter setSheetState,
@@ -602,7 +1001,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   onPressed: () async {
                     Navigator.pop(context);
                     if (amountController.text.isEmpty) return;
-
                     final prefs = await SharedPreferences.getInstance();
                     final token = prefs.getString('auth_token');
                     final response = await http.post(
@@ -621,14 +1019,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       }),
                     );
                     final data = jsonDecode(response.body);
+                    _showSnackBar(
+                      data['message'],
+                      data['success'] == true ? Colors.green : Colors.redAccent,
+                    );
                     if (data['success'] == true) {
-                      _showSnackBar(data['message'], Colors.green);
-                      _fetchAllUsers(); // Refresh background list
-                    } else {
-                      _showSnackBar(data['message'], Colors.redAccent);
+                      _fetchAllUsers();
+                      _fetchFinanceRequests(); // ✨ FUND ADD/DEDUCT KE BAAD FORAN LEDGER BHI UPDATE HOGA
                     }
                   },
-                  child: Text('CONFIRM', style: TextStyle(color: Colors.black)),
+                  child: const Text(
+                    'CONFIRM',
+                    style: TextStyle(color: Colors.black),
+                  ),
                 ),
               ],
             );
@@ -810,6 +1213,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  // ==========================================
+  // 🎨 UI BUILDER
+  // ==========================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -853,7 +1259,114 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ==========================================
-                        // 👥 1. USER MANAGEMENT SECTION
+                        // 💰 FINANCE APPROVALS
+                        // ==========================================
+                        const Text(
+                          'FINANCE & APPROVALS 💰',
+                          style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(25),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                            child: Container(
+                              padding: const EdgeInsets.all(25),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.greenAccent.withOpacity(0.5),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceAround,
+                                    children: [
+                                      Column(
+                                        children: [
+                                          const Text(
+                                            'PENDING DEPOSITS',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_pendingDeposits.length}',
+                                            style: const TextStyle(
+                                              color: Colors.greenAccent,
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Column(
+                                        children: [
+                                          const Text(
+                                            'PENDING WITHDRAWS',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_pendingWithdrawals.length}',
+                                            style: const TextStyle(
+                                              color: Colors.redAccent,
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.greenAccent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.account_balance,
+                                        color: Colors.black,
+                                      ),
+                                      label: const Text(
+                                        'MANAGE REQUESTS & LEDGER',
+                                        style: TextStyle(
+                                          color: Colors.black,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onPressed: _showFinanceBottomSheet,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+
+                        // ==========================================
+                        // 👥 USER MANAGEMENT SECTION
                         // ==========================================
                         const Text(
                           'USER MANAGEMENT 👥',
@@ -865,7 +1378,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ),
                         ),
                         const SizedBox(height: 15),
-
                         ClipRRect(
                           borderRadius: BorderRadius.circular(25),
                           child: BackdropFilter(
@@ -879,12 +1391,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   color: Colors.pinkAccent.withOpacity(0.5),
                                   width: 1.5,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.pinkAccent.withOpacity(0.1),
-                                    blurRadius: 30,
-                                  ),
-                                ],
                               ),
                               child: Column(
                                 children: [
@@ -950,7 +1456,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         const SizedBox(height: 40),
 
                         // ==========================================
-                        // 📊 2. LIVE TICKET STATS
+                        // 📊 LIVE TICKET STATS
                         // ==========================================
                         const Text(
                           'LIVE TICKET STATS 📊',
@@ -962,7 +1468,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ),
                         ),
                         const SizedBox(height: 15),
-
                         ClipRRect(
                           borderRadius: BorderRadius.circular(25),
                           child: BackdropFilter(
@@ -976,12 +1481,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   color: Colors.cyanAccent.withOpacity(0.5),
                                   width: 1.5,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.cyanAccent.withOpacity(0.1),
-                                    blurRadius: 30,
-                                  ),
-                                ],
                               ),
                               child: Column(
                                 children: [
@@ -1083,7 +1582,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         const SizedBox(height: 40),
 
                         // ==========================================
-                        // 🎰 3. DRAW CONTROL (RIGGED SETTINGS)
+                        // 🎰 DRAW CONTROL (RIGGED SETTINGS)
                         // ==========================================
                         const Text(
                           'SYSTEM OVERRIDE 🎰',
@@ -1095,7 +1594,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ),
                         ),
                         const SizedBox(height: 15),
-
                         ClipRRect(
                           borderRadius: BorderRadius.circular(25),
                           child: BackdropFilter(
@@ -1109,12 +1607,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   color: Colors.amberAccent.withOpacity(0.5),
                                   width: 1.5,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.amberAccent.withOpacity(0.1),
-                                    blurRadius: 30,
-                                  ),
-                                ],
                               ),
                               child: Column(
                                 children: [
@@ -1236,7 +1728,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         const SizedBox(height: 40),
 
                         // ==========================================
-                        // 🔒 4. SECURITY CONTROLS (LOCKED ACCOUNTS)
+                        // 🔒 SECURITY CONTROLS (LOCKED ACCOUNTS)
                         // ==========================================
                         const Text(
                           'SECURITY CONTROLS 🛡️',
@@ -1248,7 +1740,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ),
                         ),
                         const SizedBox(height: 15),
-
                         ClipRRect(
                           borderRadius: BorderRadius.circular(25),
                           child: BackdropFilter(
@@ -1262,12 +1753,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   color: Colors.redAccent.withOpacity(0.5),
                                   width: 1.5,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.redAccent.withOpacity(0.1),
-                                    blurRadius: 30,
-                                  ),
-                                ],
                               ),
                               child: Column(
                                 children: [
