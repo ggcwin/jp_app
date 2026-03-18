@@ -19,7 +19,10 @@ class _LoginScreenState extends State<LoginScreen>
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _isPasswordVisible = false; // ✨ EYE ICON STATE VARIABLE
+  bool _isPasswordVisible = false;
+
+  // ✨ NAYA: Save Password Checkbox State
+  bool _rememberMe = true;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -27,7 +30,6 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
-    // Smooth Luxury Pulse for the Tagline
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -36,6 +38,19 @@ class _LoginScreenState extends State<LoginScreen>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // ✨ NAYA: App start hotay hi saved id/password load karo
+    _loadSavedCredentials();
+  }
+
+  // ✨ NAYA: Load Credentials Function
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _usernameController.text = prefs.getString('saved_username') ?? '';
+      _passwordController.text = prefs.getString('saved_password') ?? '';
+      _rememberMe = prefs.getBool('remember_me_status') ?? true;
+    });
   }
 
   @override
@@ -74,6 +89,17 @@ class _LoginScreenState extends State<LoginScreen>
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', result['token']);
 
+      // ✨ NAYA: Save Password Logic
+      if (_rememberMe) {
+        await prefs.setString('saved_username', _usernameController.text);
+        await prefs.setString('saved_password', _passwordController.text);
+        await prefs.setBool('remember_me_status', true);
+      } else {
+        await prefs.remove('saved_username');
+        await prefs.remove('saved_password');
+        await prefs.setBool('remember_me_status', false);
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -107,7 +133,6 @@ class _LoginScreenState extends State<LoginScreen>
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // 🌌 LAYER 1: Deep Royal Purple to Black Background
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -121,8 +146,6 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
-
-          // ✨ LAYER 2: GLOWING GOLD ORBS (Luxury Lighting)
           Positioned(
             top: -50,
             right: -50,
@@ -142,8 +165,6 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
-
-          // 💎 LAYER 3: LUXURY GOLD DUST / DIAMONDS ANIMATION
           Positioned.fill(
             child: Opacity(
               opacity: 0.8,
@@ -154,15 +175,12 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
-
-          // 🛡️ LAYER 4: FROSTED GLASS UI
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 25.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // VIP Crown Icon Area
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -207,7 +225,6 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                   const SizedBox(height: 15),
 
-                  // ✨ ANIMATED TAGLINE
                   ScaleTransition(
                     scale: _pulseAnimation,
                     child: Container(
@@ -236,7 +253,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                   const SizedBox(height: 40),
 
-                  // 💎 PURE GLASSMORPHISM LOGIN BOX
                   ClipRRect(
                     borderRadius: BorderRadius.circular(30),
                     child: BackdropFilter(
@@ -286,10 +302,9 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                             const SizedBox(height: 20),
 
-                            // ✨ UPDATED PASSWORD FIELD (WITH EYE ICON)
                             TextField(
                               controller: _passwordController,
-                              obscureText: !_isPasswordVisible, // Toggle logic
+                              obscureText: !_isPasswordVisible,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -325,9 +340,34 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 35),
 
-                            // Golden Premium Button
+                            // ✨ NAYA: Save Password Checkbox UI
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _rememberMe,
+                                  activeColor: Colors.amberAccent,
+                                  checkColor: Colors.black,
+                                  side: const BorderSide(color: Colors.white54),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? true;
+                                    });
+                                  },
+                                ),
+                                const Text(
+                                  "Remember Security Key",
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 25),
+
                             SizedBox(
                               width: double.infinity,
                               height: 60,

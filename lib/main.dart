@@ -1,30 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'screens/splash_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/login_screen.dart';
+import 'screens/dashboard_screen.dart';
+// (Aap ke baqi imports aisay hi rahenge)
 
-void main() {
-  runApp(const JackpotApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // ✨ Check for existing login token
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('auth_token');
+  final bool isLoggedIn = token != null && token.isNotEmpty;
+
+  runApp(MyApp(isLoggedIn: isLoggedIn));
 }
 
-class JackpotApp extends StatelessWidget {
-  const JackpotApp({super.key});
+class MyApp extends StatelessWidget {
+  final bool isLoggedIn;
+
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Jackpot', // ✨ Naam change ho gaya
+      title: 'Jackpot',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: const Color(
-          0xFF1E003E,
-        ), // Deep Purple Background
-        primaryColor: const Color(0xFFFFB300), // Gold/Orange Color
-        textTheme: GoogleFonts.poppinsTextTheme(
-          Theme.of(context).textTheme,
-        ).apply(bodyColor: Colors.white, displayColor: Colors.white),
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E003E)),
-      ),
-      home: const SplashScreen(),
+      theme: ThemeData.dark(),
+      // ✨ Agar login hai toh seedha Dashboard, warna Login Screen
+      home: isLoggedIn ? const DashboardScreen() : const LoginScreen(),
     );
   }
 }
