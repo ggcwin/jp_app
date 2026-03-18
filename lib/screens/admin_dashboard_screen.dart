@@ -96,8 +96,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _bankNameController.text = data['settings']['bankName'] ?? '';
           _bankTitleController.text = data['settings']['bankTitle'] ?? '';
           _bankAccountController.text = data['settings']['bankAccount'] ?? '';
-          _telegramController.text =
-              data['settings']['telegramLink'] ?? ''; // ✨ NAYA
+          _telegramController.text = data['settings']['telegramLink'] ?? '';
         });
       }
     } catch (e) {}
@@ -183,8 +182,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         Uri.parse('${AppConstants.baseUrl}/wallet/admin/pending-deposits'),
         headers: {'Authorization': 'Bearer $token'},
       );
-      if (depRes.statusCode == 200)
+      if (depRes.statusCode == 200) {
         setState(() => _pendingDeposits = jsonDecode(depRes.body));
+      }
 
       final withRes = await http.get(
         Uri.parse('${AppConstants.baseUrl}/withdraw/all'),
@@ -205,8 +205,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
       if (histRes.statusCode == 200) {
         final data = jsonDecode(histRes.body);
-        if (data['success'] == true)
+        if (data['success'] == true) {
           setState(() => _globalHistory = data['history'] ?? []);
+        }
       }
     } catch (e) {}
   }
@@ -268,20 +269,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         for (var s in stats) {
           sold.add({'number': s['number'], 'count': s['count']});
           soldSet.add(s['number'].toString());
-          if (s['count'] > 1)
+          if (s['count'] > 1) {
             repeating.add({'number': s['number'], 'count': s['count']});
+          }
         }
         List<String> unsold = [];
         for (int i = 0; i <= 9999; i++) {
           String numStr = i.toString().padLeft(4, '0');
           if (!soldSet.contains(numStr)) unsold.add(numStr);
         }
-        if (mounted)
+        if (mounted) {
           setState(() {
             _soldNumbers = sold;
             _repeatingNumbers = repeating;
             _unsoldNumbers = unsold;
           });
+        }
       }
     } catch (e) {}
   }
@@ -295,8 +298,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         headers: {'Authorization': 'Bearer $token'},
       );
       final data = jsonDecode(response.body);
-      if (mounted && data['success'] == true)
+      if (mounted && data['success'] == true) {
         setState(() => _allUsers = data['users']);
+      }
     } catch (e) {}
   }
 
@@ -413,7 +417,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ⚠️ BOTTOM SHEETS
   // ========================================================
 
-  // ✨ 1. VOUCHERS BOTTOM SHEET
+  // ✨ 1. CREATE VOUCHER DIALOG
   void _showCreateVoucherDialog() {
     final amountController = TextEditingController();
     showDialog(
@@ -496,7 +500,121 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // ✨ Financial Settings Sheet (Updated with Telegram)
+  // ✨ 2. MISSING FUNCTION FIXED: VOUCHERS HISTORY BOTTOM SHEET
+  void _showVoucherHistorySheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E003E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 15),
+              Container(
+                width: 50,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white54,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 15),
+              const Text(
+                'VOUCHER HISTORY 🎟️',
+                style: TextStyle(
+                  color: Colors.purpleAccent,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: _allVouchers.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No vouchers created yet.',
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(15),
+                        itemCount: _allVouchers.length,
+                        itemBuilder: (context, index) {
+                          final voucher = _allVouchers[index];
+                          final status = voucher['status'] ?? 'active';
+                          // Check if usedBy exists and has a username
+                          String usedBy = 'None';
+                          if (voucher['usedBy'] != null) {
+                            if (voucher['usedBy'] is Map) {
+                              usedBy =
+                                  voucher['usedBy']['username'] ?? 'Unknown';
+                            } else {
+                              usedBy =
+                                  'User ID: ${voucher['usedBy']}'; // Fallback
+                            }
+                          }
+
+                          return Card(
+                            color: Colors.white.withOpacity(0.05),
+                            child: ListTile(
+                              leading: Icon(
+                                status == 'active' || status == 'Active'
+                                    ? Icons.check_circle
+                                    : Icons.cancel,
+                                color: status == 'active' || status == 'Active'
+                                    ? Colors.greenAccent
+                                    : Colors.redAccent,
+                              ),
+                              title: Text(
+                                voucher['code'] ?? 'Unknown Code',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Amount: Rs. ${voucher['amount']}\nStatus: ${status.toUpperCase()} | Used By: $usedBy',
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.copy,
+                                  color: Colors.purpleAccent,
+                                ),
+                                onPressed: () {
+                                  Clipboard.setData(
+                                    ClipboardData(text: voucher['code']),
+                                  );
+                                  _showSnackBar(
+                                    'Voucher Code Copied!',
+                                    Colors.green,
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ✨ Financial Settings Sheet
   void _showFinancialSettingsSheet() {
     showModalBottomSheet(
       context: context,
@@ -687,7 +805,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           'bankName': _bankNameController.text,
                           'bankTitle': _bankTitleController.text,
                           'bankAccount': _bankAccountController.text,
-                          'telegramLink': _telegramController.text, // ✨ NAYA
+                          'telegramLink': _telegramController.text,
                         }),
                       );
                       final data = jsonDecode(response.body);
@@ -1190,10 +1308,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         tx['details'] ?? 'No details';
 
                                     Color statusColor = Colors.greenAccent;
-                                    if (status == 'PENDING')
+                                    if (status == 'PENDING') {
                                       statusColor = Colors.orangeAccent;
-                                    if (status == 'REJECTED')
+                                    }
+                                    if (status == 'REJECTED') {
                                       statusColor = Colors.redAccent;
+                                    }
 
                                     return Card(
                                       color: Colors.white.withOpacity(0.05),
@@ -1371,15 +1491,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ),
                               color: const Color(0xFF2A004F),
                               onSelected: (value) {
-                                if (value == 'login')
+                                if (value == 'login') {
                                   _loginAsUser(user['_id'], user['username']);
-                                else if (value == 'password')
+                                } else if (value == 'password') {
                                   _showChangePasswordDialog(
                                     user['_id'],
                                     user['username'],
                                   );
-                                else if (value == 'funds')
+                                } else if (value == 'funds') {
                                   _showManageFundsDialog(user, setSheetState);
+                                }
                               },
                               itemBuilder: (context) => [
                                 const PopupMenuItem(
@@ -2209,7 +2330,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                          onPressed: _showVoucherHistorySheet,
+                                          onPressed:
+                                              _showVoucherHistorySheet, // ✨ NOW IT WORKS
                                         ),
                                       ),
                                     ],
