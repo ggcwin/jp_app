@@ -1,4 +1,4 @@
-# ggc_win
+# Jackpot
 
 A new Flutter project.
 

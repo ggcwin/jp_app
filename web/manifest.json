@@ -1,6 +1,6 @@
 {
-    "name": "ggc_win",
-    "short_name": "ggc_win",
+    "name": "Jackpot",
+    "short_name": "Jackpot",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

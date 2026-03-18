@@ -1,4 +1,4 @@
-package com.example.ggc_win
+package com.example.Jackpot
 
 import io.flutter.embedding.android.FlutterActivity
 
