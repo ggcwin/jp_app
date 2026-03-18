@@ -39,7 +39,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // Finance Approvals & Ledger
   List<dynamic> _pendingDeposits = [];
   List<dynamic> _pendingWithdrawals = [];
-  List<dynamic> _globalHistory = []; // Global Ledger History
+  List<dynamic> _globalHistory = [];
+
+  // Risk Predictor Variables
+  List<dynamic> _topRisks = [];
+  double _totalPendingSales = 0;
+  double? _customPayoutResult;
+  final TextEditingController _customPredictorController =
+      TextEditingController();
+
+  // ✨ Vouchers System
+  List<dynamic> _allVouchers = [];
 
   @override
   void initState() {
@@ -54,6 +64,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _fetchTicketStats(),
       _fetchAllUsers(),
       _fetchFinanceRequests(),
+      _fetchRiskAnalysis(),
+      _fetchVouchers(), // Fetching Vouchers
     ]);
     if (mounted) setState(() => _isLoading = false);
   }
@@ -61,48 +73,110 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ==========================================
   // 📥 API FETCH FUNCTIONS
   // ==========================================
+
+  // ✨ Fetch Vouchers
+  Future<void> _fetchVouchers() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/voucher/admin/all'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && mounted) {
+        setState(() => _allVouchers = data['vouchers'] ?? []);
+      }
+    } catch (e) {}
+  }
+
+  Future<void> _fetchRiskAnalysis() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/admin/risk-analysis'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({}),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && mounted) {
+        setState(() {
+          _topRisks = data['top20'] ?? [];
+          _totalPendingSales = (data['totalSales'] ?? 0).toDouble();
+        });
+      }
+    } catch (e) {
+      print("Risk Fetch Error: $e");
+    }
+  }
+
+  Future<void> _checkCustomNumber(
+    String testNumber,
+    StateSetter setModalState,
+  ) async {
+    if (testNumber.length != 4) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/admin/risk-analysis'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'testNumber': testNumber}),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        double payout = (data['testNumberPayout'] ?? 0).toDouble();
+        setModalState(() {
+          _customPayoutResult = payout;
+        });
+      }
+    } catch (e) {
+      _showSnackBar("Error calculating custom number.", Colors.redAccent);
+    }
+  }
+
   Future<void> _fetchFinanceRequests() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token') ?? '';
 
-      // 1. Pending Deposits
       final depRes = await http.get(
         Uri.parse('${AppConstants.baseUrl}/wallet/admin/pending-deposits'),
         headers: {'Authorization': 'Bearer $token'},
       );
-      if (depRes.statusCode == 200) {
+      if (depRes.statusCode == 200)
         setState(() => _pendingDeposits = jsonDecode(depRes.body));
-      }
 
-      // 2. Pending Withdrawals
       final withRes = await http.get(
         Uri.parse('${AppConstants.baseUrl}/withdraw/all'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (withRes.statusCode == 200) {
         List<dynamic> allRequests = jsonDecode(withRes.body);
-        setState(() {
-          _pendingWithdrawals = allRequests
+        setState(
+          () => _pendingWithdrawals = allRequests
               .where((r) => r['status'] == 'Pending')
-              .toList();
-        });
+              .toList(),
+        );
       }
 
-      // ✨ 3. Global Ledger / History (Updated with NAYA Route)
       final histRes = await http.get(
         Uri.parse('${AppConstants.baseUrl}/admin/ledger'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (histRes.statusCode == 200) {
         final data = jsonDecode(histRes.body);
-        if (data['success'] == true) {
+        if (data['success'] == true)
           setState(() => _globalHistory = data['history'] ?? []);
-        }
       }
-    } catch (e) {
-      print(e);
-    }
+    } catch (e) {}
   }
 
   Future<void> _fetchLockedUsers() async {
@@ -170,13 +244,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           String numStr = i.toString().padLeft(4, '0');
           if (!soldSet.contains(numStr)) unsold.add(numStr);
         }
-        if (mounted) {
+        if (mounted)
           setState(() {
             _soldNumbers = sold;
             _repeatingNumbers = repeating;
             _unsoldNumbers = unsold;
           });
-        }
       }
     } catch (e) {}
   }
@@ -190,9 +263,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         headers: {'Authorization': 'Bearer $token'},
       );
       final data = jsonDecode(response.body);
-      if (mounted && data['success'] == true) {
+      if (mounted && data['success'] == true)
         setState(() => _allUsers = data['users']);
-      }
     } catch (e) {}
   }
 
@@ -217,10 +289,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         data['message'],
         response.statusCode == 200 ? Colors.green : Colors.red,
       );
-      if (response.statusCode == 200) _fetchFinanceRequests(); // Refresh
-    } catch (e) {
-      _showSnackBar('Network Error', Colors.redAccent);
-    }
+      if (response.statusCode == 200) _fetchFinanceRequests();
+    } catch (e) {}
   }
 
   Future<void> _handleWithdrawAction(String requestId, String action) async {
@@ -240,10 +310,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         data['message'],
         response.statusCode == 200 ? Colors.green : Colors.red,
       );
-      if (response.statusCode == 200) _fetchFinanceRequests(); // Refresh
-    } catch (e) {
-      _showSnackBar('Network Error', Colors.redAccent);
-    }
+      if (response.statusCode == 200) _fetchFinanceRequests();
+    } catch (e) {}
   }
 
   Future<void> _unblockUser() async {
@@ -268,7 +336,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _showSnackBar(data['message'] ?? 'Action Failed.', Colors.redAccent);
       }
     } catch (e) {
-      _showSnackBar('Network Error', Colors.redAccent);
     } finally {
       if (mounted) setState(() => _isUnblocking = false);
     }
@@ -299,7 +366,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _showSnackBar(data['message'] ?? 'Failed to update!', Colors.redAccent);
       }
     } catch (e) {
-      _showSnackBar('Network Error', Colors.redAccent);
     } finally {
       if (mounted) setState(() => _isUpdatingDraw = false);
     }
@@ -312,8 +378,598 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // ========================================================
-  // 💰 FINANCE BOTTOM SHEET (WITH 3 TABS)
+  // ⚠️ BOTTOM SHEETS
   // ========================================================
+
+  // ✨ 1. VOUCHERS BOTTOM SHEET (The Missing Piece!)
+  void _showCreateVoucherDialog() {
+    final amountController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E003E),
+        title: const Text(
+          'Generate VIP Voucher 🎟️',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: amountController,
+          keyboardType: TextInputType.number,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Amount (Rs.)',
+            hintStyle: const TextStyle(color: Colors.white38),
+            filled: true,
+            fillColor: Colors.black.withOpacity(0.3),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purpleAccent,
+            ),
+            onPressed: () async {
+              if (amountController.text.isEmpty) return;
+              Navigator.pop(context);
+              final prefs = await SharedPreferences.getInstance();
+              final token = prefs.getString('auth_token');
+
+              final response = await http.post(
+                Uri.parse('${AppConstants.baseUrl}/voucher/create'),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer $token',
+                },
+                body: jsonEncode({
+                  'amount': amountController.text,
+                  'walletType': 'admin_bypass',
+                }),
+              );
+
+              final data = jsonDecode(response.body);
+              if (data['success'] == true) {
+                _showSnackBar(
+                  'Voucher Generated: ${data['voucher']['code']}',
+                  Colors.green,
+                );
+                Clipboard.setData(
+                  ClipboardData(text: data['voucher']['code']),
+                ); // Auto Copy
+                _fetchVouchers(); // Refresh list
+              }
+            },
+            child: const Text(
+              'CREATE & COPY',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showVoucherHistorySheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E003E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 15),
+              Container(
+                width: 50,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white54,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 15),
+              const Text(
+                'MASTER VOUCHER RECORDS 🎟️',
+                style: TextStyle(
+                  color: Colors.purpleAccent,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              Expanded(
+                child: _allVouchers.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No vouchers found in database.',
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(15),
+                        itemCount: _allVouchers.length,
+                        itemBuilder: (context, index) {
+                          final v = _allVouchers[index];
+                          final isRedeemed = v['status'] == 'redeemed';
+
+                          final creator = v['createdBy'] != null
+                              ? v['createdBy']['username']
+                              : 'Unknown';
+                          final role = v['createdBy'] != null
+                              ? v['createdBy']['role']
+                              : 'user';
+                          final redeemer = isRedeemed && v['redeemedBy'] != null
+                              ? v['redeemedBy']['username']
+                              : 'Not Redeemed';
+
+                          DateTime createdDate = DateTime.parse(
+                            v['createdAt'],
+                          ).toLocal();
+                          String dateStr =
+                              "${createdDate.day}-${createdDate.month}-${createdDate.year}";
+                          String timeStr =
+                              "${createdDate.hour}:${createdDate.minute.toString().padLeft(2, '0')}";
+
+                          return Card(
+                            color: Colors.white.withOpacity(0.05),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              side: BorderSide(
+                                color: isRedeemed
+                                    ? Colors.white12
+                                    : Colors.purpleAccent.withOpacity(0.5),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(15.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        v['code'],
+                                        style: TextStyle(
+                                          color: isRedeemed
+                                              ? Colors.white54
+                                              : Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                          letterSpacing: 2,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Rs. ${v['amount']}',
+                                        style: TextStyle(
+                                          color: isRedeemed
+                                              ? Colors.white38
+                                              : Colors.greenAccent,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(color: Colors.white24),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Date & Time:',
+                                        style: TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      Text(
+                                        '$dateStr | $timeStr',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Created By:',
+                                        style: TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      Text(
+                                        '$creator (${role.toUpperCase()})',
+                                        style: TextStyle(
+                                          color: role == 'admin'
+                                              ? Colors.amberAccent
+                                              : Colors.cyanAccent,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Status:',
+                                        style: TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      Text(
+                                        isRedeemed ? 'REDEEMED' : 'ACTIVE',
+                                        style: TextStyle(
+                                          color: isRedeemed
+                                              ? Colors.redAccent
+                                              : Colors.greenAccent,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (isRedeemed) ...[
+                                    const SizedBox(height: 5),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'Redeemed By:',
+                                          style: TextStyle(
+                                            color: Colors.white54,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        Text(
+                                          redeemer,
+                                          style: const TextStyle(
+                                            color: Colors.orangeAccent,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ] else ...[
+                                    const SizedBox(height: 10),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          side: const BorderSide(
+                                            color: Colors.purpleAccent,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 0,
+                                          ),
+                                        ),
+                                        icon: const Icon(
+                                          Icons.copy,
+                                          color: Colors.purpleAccent,
+                                          size: 16,
+                                        ),
+                                        label: const Text(
+                                          'COPY CODE',
+                                          style: TextStyle(
+                                            color: Colors.purpleAccent,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          Clipboard.setData(
+                                            ClipboardData(text: v['code']),
+                                          );
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Code Copied!'),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 2. Risk Predictor
+  void _showRiskPredictorSheet() {
+    _customPredictorController.clear();
+    _customPayoutResult = null;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E003E),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 15),
+                  Container(
+                    width: 50,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.white54,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  const Text(
+                    'PAYOUT PREDICTOR ⚠️',
+                    style: TextStyle(
+                      color: Colors.orangeAccent,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                      fontSize: 18,
+                    ),
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.all(15.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Column(
+                          children: [
+                            const Text(
+                              'Total Sold Amount',
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              'Rs. ${_totalPendingSales.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                color: Colors.greenAccent,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          children: [
+                            const Text(
+                              'Highest Risk Payout',
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              'Rs. ${_topRisks.isNotEmpty ? _topRisks[0]['payout'] : 0}',
+                              style: const TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(color: Colors.white24),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Custom Number Check:',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _customPredictorController,
+                                keyboardType: TextInputType.number,
+                                maxLength: 4,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  letterSpacing: 5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                decoration: InputDecoration(
+                                  counterText: "",
+                                  hintText: "e.g. 1234",
+                                  hintStyle: const TextStyle(
+                                    color: Colors.white38,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.black.withOpacity(0.3),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(15),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                                onChanged: (val) {
+                                  if (val.length == 4) {
+                                    _checkCustomNumber(val, setModalState);
+                                  } else {
+                                    setModalState(
+                                      () => _customPayoutResult = null,
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 15),
+                            Container(
+                              height: 55,
+                              width: 120,
+                              decoration: BoxDecoration(
+                                color: Colors.orangeAccent.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(color: Colors.orangeAccent),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _customPayoutResult != null
+                                      ? 'Rs. ${_customPayoutResult?.toStringAsFixed(0)}'
+                                      : 'Payout',
+                                  style: TextStyle(
+                                    color: _customPayoutResult != null
+                                        ? Colors.redAccent
+                                        : Colors.white54,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(color: Colors.white24),
+
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.only(left: 20),
+                      child: Text(
+                        'Top 20 High-Risk Numbers:',
+                        style: TextStyle(
+                          color: Colors.orangeAccent,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  Expanded(
+                    child: _topRisks.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No active tickets found.',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 15),
+                            itemCount: _topRisks.length,
+                            itemBuilder: (context, index) {
+                              final item = _topRisks[index];
+                              return Card(
+                                color: Colors.white.withOpacity(0.05),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.redAccent
+                                        .withOpacity(0.2),
+                                    child: Text(
+                                      '${index + 1}',
+                                      style: const TextStyle(
+                                        color: Colors.redAccent,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    'Draw Number: ${item['number']}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                  trailing: Text(
+                                    'Loss: Rs. ${item['payout']}',
+                                    style: const TextStyle(
+                                      color: Colors.redAccent,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 3. Finance
   void _showFinanceBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -366,7 +1022,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Expanded(
                       child: TabBarView(
                         children: [
-                          // TAB 1: PENDING DEPOSITS
                           _pendingDeposits.isEmpty
                               ? const Center(
                                   child: Text(
@@ -419,7 +1074,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   },
                                 ),
 
-                          // TAB 2: PENDING WITHDRAWALS
                           _pendingWithdrawals.isEmpty
                               ? const Center(
                                   child: Text(
@@ -526,7 +1180,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   },
                                 ),
 
-                          // ✨ TAB 3: GLOBAL LEDGER HISTORY
                           _globalHistory.isEmpty
                               ? const Center(
                                   child: Text(
@@ -539,7 +1192,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   itemCount: _globalHistory.length,
                                   itemBuilder: (context, index) {
                                     final tx = _globalHistory[index];
-                                    // ✨ Yahan ab directly username show hoga!
                                     final username = tx['userId'] != null
                                         ? tx['userId']['username']
                                         : 'System';
@@ -626,9 +1278,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // ========================================================
-  // 👥 USER MANAGEMENT BOTTOM SHEET
-  // ========================================================
+  // 4. Users
   void _showUserManagementSheet() {
     String searchQuery = '';
     showModalBottomSheet(
@@ -1025,7 +1675,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     );
                     if (data['success'] == true) {
                       _fetchAllUsers();
-                      _fetchFinanceRequests(); // ✨ FUND ADD/DEDUCT KE BAAD FORAN LEDGER BHI UPDATE HOGA
+                      _fetchFinanceRequests();
                     }
                   },
                   child: const Text(
@@ -1041,6 +1691,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  // 5. Stats
   void _showStatsBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -1258,9 +1909,112 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ==========================================
-                        // 💰 FINANCE APPROVALS
-                        // ==========================================
+                        // 1. RISK PREDICTOR
+                        const Text(
+                          'RISK MANAGEMENT ⚠️',
+                          style: TextStyle(
+                            color: Colors.orangeAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(25),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                            child: Container(
+                              padding: const EdgeInsets.all(25),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.orangeAccent.withOpacity(0.5),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceAround,
+                                    children: [
+                                      Column(
+                                        children: [
+                                          const Text(
+                                            'TOTAL SOLD',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Rs. ${_totalPendingSales.toStringAsFixed(0)}',
+                                            style: const TextStyle(
+                                              color: Colors.greenAccent,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Column(
+                                        children: [
+                                          const Text(
+                                            'MAX PAYOUT',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Rs. ${_topRisks.isNotEmpty ? _topRisks[0]['payout'] : 0}',
+                                            style: const TextStyle(
+                                              color: Colors.redAccent,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orangeAccent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.analytics,
+                                        color: Colors.black,
+                                      ),
+                                      label: const Text(
+                                        'OPEN PAYOUT PREDICTOR',
+                                        style: TextStyle(
+                                          color: Colors.black,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onPressed: _showRiskPredictorSheet,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+
+                        // 2. FINANCE APPROVALS
                         const Text(
                           'FINANCE & APPROVALS 💰',
                           style: TextStyle(
@@ -1365,9 +2119,127 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(height: 40),
 
-                        // ==========================================
-                        // 👥 USER MANAGEMENT SECTION
-                        // ==========================================
+                        // ✨ 3. VOUCHER MANAGEMENT (ADDED BACK!)
+                        const Text(
+                          'VOUCHER MANAGEMENT 🎟️',
+                          style: TextStyle(
+                            color: Colors.purpleAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(25),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                            child: Container(
+                              padding: const EdgeInsets.all(25),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.purpleAccent.withOpacity(0.5),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  const Icon(
+                                    Icons.card_giftcard,
+                                    size: 60,
+                                    color: Colors.purpleAccent,
+                                  ),
+                                  const SizedBox(height: 15),
+                                  const Text(
+                                    'GIFT VOUCHERS',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    'Generate free balance codes for giveaways & view redemption history.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 25),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                Colors.purpleAccent,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                          ),
+                                          icon: const Icon(
+                                            Icons.add,
+                                            color: Colors.black,
+                                          ),
+                                          label: const Text(
+                                            'CREATE',
+                                            style: TextStyle(
+                                              color: Colors.black,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          onPressed: _showCreateVoucherDialog,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(
+                                              color: Colors.purpleAccent,
+                                              width: 2,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                          ),
+                                          icon: const Icon(
+                                            Icons.history,
+                                            color: Colors.purpleAccent,
+                                          ),
+                                          label: const Text(
+                                            'RECORDS',
+                                            style: TextStyle(
+                                              color: Colors.purpleAccent,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          onPressed: _showVoucherHistorySheet,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+
+                        // 4. USER MANAGEMENT
                         const Text(
                           'USER MANAGEMENT 👥',
                           style: TextStyle(
@@ -1455,9 +2327,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(height: 40),
 
-                        // ==========================================
-                        // 📊 LIVE TICKET STATS
-                        // ==========================================
+                        // 5. LIVE TICKET STATS
                         const Text(
                           'LIVE TICKET STATS 📊',
                           style: TextStyle(
@@ -1581,9 +2451,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(height: 40),
 
-                        // ==========================================
-                        // 🎰 DRAW CONTROL (RIGGED SETTINGS)
-                        // ==========================================
+                        // 6. SYSTEM OVERRIDE
                         const Text(
                           'SYSTEM OVERRIDE 🎰',
                           style: TextStyle(
@@ -1727,9 +2595,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(height: 40),
 
-                        // ==========================================
-                        // 🔒 SECURITY CONTROLS (LOCKED ACCOUNTS)
-                        // ==========================================
+                        // 7. SECURITY CONTROLS
                         const Text(
                           'SECURITY CONTROLS 🛡️',
                           style: TextStyle(

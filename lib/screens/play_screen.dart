@@ -121,6 +121,9 @@ class _PlayScreenState extends State<PlayScreen> {
     List<String> receiptDisplayStrings = [];
     List<Map<String, dynamic>> backendLinesData = [];
 
+    // ✨ REAL PRIZE CALCULATION LOGIC (As per new rules)
+    double calculatedWinAmount = 0.0;
+
     for (int r = 0; r < _rowsControllers.length; r++) {
       int filledCount = _rowsControllers[r]
           .where((c) => c.text.isNotEmpty)
@@ -142,9 +145,7 @@ class _PlayScreenState extends State<PlayScreen> {
           _rowsTypes[r]['mixFix'] == false) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Please select Fix or Mix for Line ${r + 1}!', // ✨ Changed text here
-            ),
+            content: const Text('Please select Fix or Mix for Line!'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -166,13 +167,30 @@ class _PlayScreenState extends State<PlayScreen> {
       }
 
       String typeStr = "";
+      double lineWin = 0.0;
+
       if (_selectedGame == '4tune') {
         List<String> t = [];
-        if (_rowsTypes[r]['straight'] == true)
-          t.add("Fix"); // ✨ Changed 'Str' to 'Fix'
-        if (_rowsTypes[r]['mixFix'] == true) t.add("Mix");
+        if (_rowsTypes[r]['straight'] == true) {
+          t.add("Fix");
+          lineWin += 40000; // ✨ 4tune Fix Reward
+        }
+        if (_rowsTypes[r]['mixFix'] == true) {
+          t.add("Mix");
+          lineWin += 1500; // ✨ 4tune Mix Reward
+        }
         typeStr = " (${t.join('+')})";
+      } else if (_selectedGame == '3luck') {
+        lineWin = 4000; // ✨ 3luck Reward
+      } else if (_selectedGame == '2win') {
+        lineWin = 400; // ✨ 2win Reward
+      } else if (_selectedGame == '1won') {
+        lineWin = 40; // ✨ 1won Reward
       }
+
+      // Quantity se multiply karein taake actual win prize niklay
+      calculatedWinAmount += (lineWin * _ticketQuantity);
+
       receiptDisplayStrings.add("$displayNumber$typeStr");
 
       backendLinesData.add({
@@ -217,11 +235,12 @@ class _PlayScreenState extends State<PlayScreen> {
             gameType: _selectedGame!,
             matchType: _selectedGame == '4tune'
                 ? 'Custom per line'
-                : 'Positional',
+                : 'Positional Exact Match',
             amount: (data['amountPaid'] as num).toDouble(),
             username: data['username'],
             email: data['email'],
-            winAmount: (data['winAmount'] as num).toDouble(),
+            // ✨ Yahan ab backend ke dummy data ki jagah real frontend calculation jaayegi
+            winAmount: calculatedWinAmount,
             sponsorUsername: data['sponsorUsername'],
             grandSponsorUsername: data['grandSponsorUsername'],
           ),
@@ -594,7 +613,6 @@ class _PlayScreenState extends State<PlayScreen> {
                                             ),
                                           ),
                                         ),
-                                        // ✨ LABEL UPDATED TO 'Fix'
                                         const Text(
                                           'Fix',
                                           style: TextStyle(
@@ -619,7 +637,6 @@ class _PlayScreenState extends State<PlayScreen> {
                                             ),
                                           ),
                                         ),
-                                        // ✨ LABEL UPDATED TO 'Mix'
                                         const Text(
                                           'Mix',
                                           style: TextStyle(

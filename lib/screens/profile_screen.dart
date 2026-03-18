@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
-import 'admin_dashboard_screen.dart'; // ✨ NAYA IMPORT
+import 'admin_dashboard_screen.dart';
+import 'my_network_screen.dart'; // ✨ NAYA IMPORT
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -185,6 +186,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 15),
                         ],
+
+                        // ✨ NAYA BUTTON: MY NETWORK
+                        ListTile(
+                          leading: const Icon(
+                            Icons.group_add,
+                            color: Colors.cyanAccent,
+                            size: 30,
+                          ),
+                          title: const Text(
+                            'My Network & Affiliate',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'View Team & 5% Commissions',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: const Icon(
+                            Icons.arrow_forward_ios,
+                            color: Colors.white54,
+                            size: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          tileColor: Colors.white.withOpacity(0.05),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MyNetworkScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 15),
 
                         // ✏️ Update Profile Menu Item
                         ListTile(
