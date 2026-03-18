@@ -7,6 +7,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
 import 'dashboard_screen.dart';
 
+// ✨ Financial Settings Controllers
+final TextEditingController _trc20Controller = TextEditingController();
+final TextEditingController _bep20Controller = TextEditingController();
+final TextEditingController _bankNameController = TextEditingController();
+final TextEditingController _bankTitleController = TextEditingController();
+final TextEditingController _bankAccountController = TextEditingController();
+// ✨ NAYA: Telegram Controller
+final TextEditingController _telegramController = TextEditingController();
+
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -65,16 +74,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _fetchAllUsers(),
       _fetchFinanceRequests(),
       _fetchRiskAnalysis(),
-      _fetchVouchers(), // Fetching Vouchers
+      _fetchVouchers(),
+      _fetchFinancialSettings(), // Fetching Financial Settings
     ]);
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _fetchFinancialSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/settings/financial'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        setState(() {
+          _trc20Controller.text = data['settings']['usdtTrc20'] ?? '';
+          _bep20Controller.text = data['settings']['usdtBep20'] ?? '';
+          _bankNameController.text = data['settings']['bankName'] ?? '';
+          _bankTitleController.text = data['settings']['bankTitle'] ?? '';
+          _bankAccountController.text = data['settings']['bankAccount'] ?? '';
+          _telegramController.text =
+              data['settings']['telegramLink'] ?? ''; // ✨ NAYA
+        });
+      }
+    } catch (e) {}
   }
 
   // ==========================================
   // 📥 API FETCH FUNCTIONS
   // ==========================================
 
-  // ✨ Fetch Vouchers
   Future<void> _fetchVouchers() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -381,7 +413,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ⚠️ BOTTOM SHEETS
   // ========================================================
 
-  // ✨ 1. VOUCHERS BOTTOM SHEET (The Missing Piece!)
+  // ✨ 1. VOUCHERS BOTTOM SHEET
   void _showCreateVoucherDialog() {
     final amountController = TextEditingController();
     showDialog(
@@ -447,10 +479,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   'Voucher Generated: ${data['voucher']['code']}',
                   Colors.green,
                 );
-                Clipboard.setData(
-                  ClipboardData(text: data['voucher']['code']),
-                ); // Auto Copy
-                _fetchVouchers(); // Refresh list
+                Clipboard.setData(ClipboardData(text: data['voucher']['code']));
+                _fetchVouchers();
               }
             },
             child: const Text(
@@ -466,258 +496,210 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  void _showVoucherHistorySheet() {
+  // ✨ Financial Settings Sheet (Updated with Telegram)
+  void _showFinancialSettingsSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
           height: MediaQuery.of(context).size.height * 0.85,
           decoration: const BoxDecoration(
             color: Color(0xFF1E003E),
             borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
           ),
-          child: Column(
-            children: [
-              const SizedBox(height: 15),
-              Container(
-                width: 50,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.white54,
-                  borderRadius: BorderRadius.circular(10),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Container(
+                  width: 50,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white54,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 15),
-              const Text(
-                'MASTER VOUCHER RECORDS 🎟️',
-                style: TextStyle(
-                  color: Colors.purpleAccent,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                  fontSize: 18,
+                const SizedBox(height: 15),
+                const Text(
+                  'PAYMENT GATEWAYS 💳',
+                  style: TextStyle(
+                    color: Colors.blueAccent,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    fontSize: 18,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
+                const SizedBox(height: 20),
 
-              Expanded(
-                child: _allVouchers.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No vouchers found in database.',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(15),
-                        itemCount: _allVouchers.length,
-                        itemBuilder: (context, index) {
-                          final v = _allVouchers[index];
-                          final isRedeemed = v['status'] == 'redeemed';
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Crypto Addresses',
+                    style: TextStyle(
+                      color: Colors.greenAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _trc20Controller,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'USDT (TRC20)',
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _bep20Controller,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'USDT (BEP20)',
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
 
-                          final creator = v['createdBy'] != null
-                              ? v['createdBy']['username']
-                              : 'Unknown';
-                          final role = v['createdBy'] != null
-                              ? v['createdBy']['role']
-                              : 'user';
-                          final redeemer = isRedeemed && v['redeemedBy'] != null
-                              ? v['redeemedBy']['username']
-                              : 'Not Redeemed';
+                const SizedBox(height: 25),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Local Bank Details',
+                    style: TextStyle(
+                      color: Colors.pinkAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _bankNameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Bank Name (e.g. Meezan)',
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _bankTitleController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Account Title',
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _bankAccountController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Account / IBAN Number',
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
 
-                          DateTime createdDate = DateTime.parse(
-                            v['createdAt'],
-                          ).toLocal();
-                          String dateStr =
-                              "${createdDate.day}-${createdDate.month}-${createdDate.year}";
-                          String timeStr =
-                              "${createdDate.hour}:${createdDate.minute.toString().padLeft(2, '0')}";
+                // ✨ NAYA: Telegram Settings UI
+                const SizedBox(height: 25),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Support Settings',
+                    style: TextStyle(
+                      color: Colors.cyanAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _telegramController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Telegram Link (e.g. https://t.me/admin)',
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
 
-                          return Card(
-                            color: Colors.white.withOpacity(0.05),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              side: BorderSide(
-                                color: isRedeemed
-                                    ? Colors.white12
-                                    : Colors.purpleAccent.withOpacity(0.5),
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(15.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        v['code'],
-                                        style: TextStyle(
-                                          color: isRedeemed
-                                              ? Colors.white54
-                                              : Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                          letterSpacing: 2,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Rs. ${v['amount']}',
-                                        style: TextStyle(
-                                          color: isRedeemed
-                                              ? Colors.white38
-                                              : Colors.greenAccent,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const Divider(color: Colors.white24),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'Date & Time:',
-                                        style: TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        '$dateStr | $timeStr',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'Created By:',
-                                        style: TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        '$creator (${role.toUpperCase()})',
-                                        style: TextStyle(
-                                          color: role == 'admin'
-                                              ? Colors.amberAccent
-                                              : Colors.cyanAccent,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'Status:',
-                                        style: TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        isRedeemed ? 'REDEEMED' : 'ACTIVE',
-                                        style: TextStyle(
-                                          color: isRedeemed
-                                              ? Colors.redAccent
-                                              : Colors.greenAccent,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (isRedeemed) ...[
-                                    const SizedBox(height: 5),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'Redeemed By:',
-                                          style: TextStyle(
-                                            color: Colors.white54,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        Text(
-                                          redeemer,
-                                          style: const TextStyle(
-                                            color: Colors.orangeAccent,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ] else ...[
-                                    const SizedBox(height: 10),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          side: const BorderSide(
-                                            color: Colors.purpleAccent,
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 0,
-                                          ),
-                                        ),
-                                        icon: const Icon(
-                                          Icons.copy,
-                                          color: Colors.purpleAccent,
-                                          size: 16,
-                                        ),
-                                        label: const Text(
-                                          'COPY CODE',
-                                          style: TextStyle(
-                                            color: Colors.purpleAccent,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        onPressed: () {
-                                          Clipboard.setData(
-                                            ClipboardData(text: v['code']),
-                                          );
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Code Copied!'),
-                                              backgroundColor: Colors.green,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                const SizedBox(height: 25),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                    ),
+                    child: const Text(
+                      'SAVE SETTINGS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
-              ),
-            ],
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      final prefs = await SharedPreferences.getInstance();
+                      final token = prefs.getString('auth_token');
+                      final response = await http.post(
+                        Uri.parse('${AppConstants.baseUrl}/settings/financial'),
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': 'Bearer $token',
+                        },
+                        body: jsonEncode({
+                          'usdtTrc20': _trc20Controller.text,
+                          'usdtBep20': _bep20Controller.text,
+                          'bankName': _bankNameController.text,
+                          'bankTitle': _bankTitleController.text,
+                          'bankAccount': _bankAccountController.text,
+                          'telegramLink': _telegramController.text, // ✨ NAYA
+                        }),
+                      );
+                      final data = jsonDecode(response.body);
+                      _showSnackBar(
+                        data['message'],
+                        data['success'] == true ? Colors.green : Colors.red,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -2119,7 +2101,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(height: 40),
 
-                        // ✨ 3. VOUCHER MANAGEMENT (ADDED BACK!)
+                        // ✨ 3. VOUCHER MANAGEMENT
                         const Text(
                           'VOUCHER MANAGEMENT 🎟️',
                           style: TextStyle(
@@ -2595,7 +2577,92 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(height: 40),
 
-                        // 7. SECURITY CONTROLS
+                        // ✨ 7. PAYMENT GATEWAY SETTINGS
+                        const Text(
+                          'PAYMENT SETTINGS 💳',
+                          style: TextStyle(
+                            color: Colors.blueAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(25),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                            child: Container(
+                              padding: const EdgeInsets.all(25),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.blueAccent.withOpacity(0.5),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  const Icon(
+                                    Icons.account_balance,
+                                    size: 60,
+                                    color: Colors.blueAccent,
+                                  ),
+                                  const SizedBox(height: 15),
+                                  const Text(
+                                    'DEPOSIT ACCOUNTS',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    'Update your USDT, Bank details, and Telegram link displayed to users.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 25),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blueAccent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.edit,
+                                        color: Colors.white,
+                                      ),
+                                      label: const Text(
+                                        'EDIT FINANCIAL DETAILS',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onPressed: _showFinancialSettingsSheet,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+
+                        // 8. SECURITY CONTROLS
                         const Text(
                           'SECURITY CONTROLS 🛡️',
                           style: TextStyle(

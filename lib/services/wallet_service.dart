@@ -4,36 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
 
 class WalletService {
-  static const String baseUrl = '${AppConstants.baseUrl}/auth';
-
-  static Future<Map<String, dynamic>> depositFunds({
-    required double amount,
-    required String method,
-  }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-
-      if (token == null) return {'success': false, 'message': 'Not logged in'};
-
-      final response = await http.post(
-        Uri.parse('$baseUrl/deposit'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'amount': amount, 'method': method}),
-      );
-
-      return jsonDecode(response.body);
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Network Error. Check your connection.',
-      };
-    }
-  }
-
+  // --- 💸 WITHDRAW FUNDS (10% Fee Logic) ---
   static Future<Map<String, dynamic>> withdrawFunds({
     required double amount,
     required String method,
@@ -47,7 +18,9 @@ class WalletService {
       if (token == null) return {'success': false, 'message': 'Not logged in'};
 
       final response = await http.post(
-        Uri.parse('$baseUrl/withdraw'),
+        Uri.parse(
+          '${AppConstants.baseUrl}/withdraw/request',
+        ), // ✨ FIX: Correct Route
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -56,7 +29,7 @@ class WalletService {
           'amount': amount,
           'method': method,
           'walletType': walletType,
-          'details': details,
+          'accountDetails': details,
         }),
       );
 
@@ -69,7 +42,7 @@ class WalletService {
     }
   }
 
-  // --- 🎟️ CREATE VOUCHER (NEW) ---
+  // --- 🎟️ CREATE VOUCHER (User Paid + 3% Fee) ---
   static Future<Map<String, dynamic>> createVoucher({
     required double amount,
     required String walletType,
@@ -80,7 +53,9 @@ class WalletService {
       if (token == null) return {'success': false, 'message': 'Not logged in'};
 
       final response = await http.post(
-        Uri.parse('$baseUrl/create-voucher'),
+        Uri.parse(
+          '${AppConstants.baseUrl}/voucher/create',
+        ), // ✨ FIX: Correct Route
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -93,7 +68,7 @@ class WalletService {
     }
   }
 
-  // --- 🎁 REDEEM VOUCHER (NEW) ---
+  // --- 🎁 REDEEM VOUCHER ---
   static Future<Map<String, dynamic>> redeemVoucher({
     required String code,
   }) async {
@@ -103,12 +78,43 @@ class WalletService {
       if (token == null) return {'success': false, 'message': 'Not logged in'};
 
       final response = await http.post(
-        Uri.parse('$baseUrl/redeem-voucher'),
+        Uri.parse(
+          '${AppConstants.baseUrl}/voucher/redeem',
+        ), // ✨ FIX: Correct Route
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({'code': code}),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network Error.'};
+    }
+  }
+
+  // --- 💸 TRANSFER FUNDS (P2P - 7% Fee) ---
+  static Future<Map<String, dynamic>> transferFunds({
+    required String receiverUsername,
+    required double amount,
+    required String walletType,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      if (token == null) return {'success': false, 'message': 'Not logged in'};
+
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/transfer'), // ✨ FIX: Correct Route
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'receiverUsername': receiverUsername,
+          'amount': amount,
+          'walletType': walletType,
+        }),
       );
       return jsonDecode(response.body);
     } catch (e) {
